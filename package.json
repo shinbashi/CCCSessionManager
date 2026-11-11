@@ -1,5 +1,5 @@
 {
-  "name": "claudesessions",
+  "name": "ccc-session-manager",
   "private": true,
   "version": "0.1.0",
   "type": "module",
@@ -7,23 +7,30 @@
     "dev": "vite",
     "build": "tsc && vite build",
     "preview": "vite preview",
-    "tauri": "tauri"
+    "tauri": "tauri",
+    "test": "vitest run"
   },
   "dependencies": {
     "@tanstack/react-virtual": "^3.14.26",
     "@tauri-apps/api": "^2",
     "@tauri-apps/plugin-opener": "^2",
+    "highlight.js": "^11.12.0",
     "react": "^19.1.0",
-    "react-dom": "^19.1.0"
+    "react-dom": "^19.1.0",
+    "react-markdown": "^10.1.0",
+    "rehype-highlight": "^7.0.2",
+    "remark-gfm": "^4.0.1"
   },
   "devDependencies": {
     "@tailwindcss/vite": "^4.3.5",
     "@tauri-apps/cli": "^2",
+    "@types/hast": "^3.0.5",
     "@types/react": "^19.1.8",
     "@types/react-dom": "^19.1.6",
     "@vitejs/plugin-react": "^6.0.2",
     "tailwindcss": "^4.3.5",
     "typescript": "~6.0.3",
-    "vite": "^8.0.16"
+    "vite": "^8.0.16",
+    "vitest": "^4.1.12"
   }
 }

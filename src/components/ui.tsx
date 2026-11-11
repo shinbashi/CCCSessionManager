@@ -6,7 +6,7 @@ export function KindBadge({ kind, toolName }: { kind: BlockKind; toolName?: stri
   const { label, color } = kindInfo(kind);
   return (
     <span
-      className="inline-flex shrink-0 items-center gap-1 rounded px-1.5 py-0.5 text-[11px] font-semibold"
+      className="inline-flex shrink-0 items-center gap-1 rounded px-1.5 py-0.5 text-xs font-semibold"
       style={{ color, background: `color-mix(in oklch, ${color} 14%, transparent)`, border: `1px solid color-mix(in oklch, ${color} 40%, transparent)` }}
     >
       {label}
@@ -27,7 +27,7 @@ const LIVE_STYLE = {
 export function LiveBadge({ session }: { session: SessionInfo }) {
   const state = liveState(session);
   return (
-    <span className={`shrink-0 rounded border px-1.5 py-px text-[10px] font-semibold ${LIVE_STYLE[state]}`}>
+    <span className={`shrink-0 rounded border px-1.5 py-px text-[11px] font-semibold ${LIVE_STYLE[state]}`}>
       {LIVE_LABEL[state]}
     </span>
   );
@@ -36,7 +36,7 @@ export function LiveBadge({ session }: { session: SessionInfo }) {
 export function SubagentBadge({ session }: { session: SessionInfo }) {
   if (session.kind !== "subagent") return null;
   return (
-    <span className="shrink-0 rounded border border-kind-tool-use/40 px-1.5 py-px text-[10px] text-kind-tool-use">
+    <span className="shrink-0 rounded border border-kind-tool-use/40 px-1.5 py-px text-[11px] text-kind-tool-use">
       {session.agentType ?? "subagent"}
     </span>
   );
@@ -66,7 +66,7 @@ export function Chip({ active, color, onClick, children }: { active: boolean; co
     <button
       type="button"
       onClick={onClick}
-      className="rounded-full border px-2 py-0.5 text-[11px] transition"
+      className="rounded-full border px-2 py-0.5 text-xs transition"
       style={
         active
           ? { color: c, borderColor: `color-mix(in oklch, ${c} 60%, transparent)`, background: `color-mix(in oklch, ${c} 14%, transparent)` }

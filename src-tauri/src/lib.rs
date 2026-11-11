@@ -43,7 +43,7 @@ fn run_stdout(mut cmd: Command) -> String {
 /// アプリが休止させたセッションの記録 (~/Library/Application Support/<identifier>/suspended.json)
 fn suspended_store_path() -> PathBuf {
     let home = std::env::var("HOME").unwrap_or_default();
-    PathBuf::from(home).join("Library/Application Support/io.github.shinbashi.claude-sessions/suspended.json")
+    PathBuf::from(home).join("Library/Application Support/io.github.shinbashi.cccsessionmanager/suspended.json")
 }
 
 fn claude_dir() -> Result<PathBuf, String> {

@@ -68,20 +68,20 @@ export function Explorer({ sessions, selectedPath, onSelect }: Props) {
     });
 
   return (
-    <aside className="flex h-full w-[340px] shrink-0 flex-col border-r border-line bg-panel">
+    <aside className="flex h-full w-[380px] shrink-0 flex-col border-r border-line bg-panel">
       <div className="space-y-2 border-b border-line p-3">
         <div className="flex items-center gap-2">
           <span className="text-xs font-semibold tracking-wider text-accent uppercase">Explorer</span>
-          <span className="text-[11px] text-dim">
+          <span className="text-xs whitespace-nowrap text-dim">
             {visible.length} / {sessions.length} 件・実行中 <span className="text-success">{liveCount}</span>
           </span>
-          <div className="ml-auto flex overflow-hidden rounded border border-line text-[11px]">
+          <div className="ml-auto flex overflow-hidden rounded border border-line text-xs">
             {(["list", "folder"] as View[]).map((v) => (
               <button
                 key={v}
                 type="button"
                 onClick={() => update({ view: v })}
-                className={`px-2 py-0.5 ${prefs.view === v ? "bg-accent/15 text-accent" : "text-dim hover:text-fg"}`}
+                className={`px-2 py-0.5 whitespace-nowrap ${prefs.view === v ? "bg-accent/15 text-accent" : "text-dim hover:text-fg"}`}
               >
                 {v === "list" ? "一覧" : "フォルダ別"}
               </button>
@@ -100,7 +100,7 @@ export function Explorer({ sessions, selectedPath, onSelect }: Props) {
           <select
             value={prefs.sort}
             onChange={(e) => update({ sort: e.target.value as SortKey })}
-            className="rounded border border-line bg-bg px-1.5 py-0.5 text-[11px] text-muted outline-none"
+            className="rounded border border-line bg-bg px-1.5 py-0.5 text-xs text-muted outline-none"
           >
             {(Object.keys(SORT_LABEL) as SortKey[]).map((k) => (
               <option key={k} value={k}>
@@ -111,7 +111,7 @@ export function Explorer({ sessions, selectedPath, onSelect }: Props) {
           <button
             type="button"
             onClick={() => update({ desc: !prefs.desc })}
-            className="rounded border border-line px-1.5 py-0.5 text-[11px] text-muted hover:text-fg"
+            className="rounded border border-line px-1.5 py-0.5 text-xs text-muted hover:text-fg"
             title="並び順を反転"
           >
             {prefs.desc ? "↓ 降順" : "↑ 昇順"}
@@ -152,10 +152,10 @@ export function Explorer({ sessions, selectedPath, onSelect }: Props) {
                     className="flex w-full items-center gap-2 border-b border-line/60 px-3 py-1.5 text-left hover:bg-card-hover"
                     title={folder}
                   >
-                    <span className="w-3 text-[10px] text-dim">{open ? "▼" : "▶"}</span>
+                    <span className="w-3 text-[11px] text-dim">{open ? "▼" : "▶"}</span>
                     <span className="truncate text-xs font-medium">{folderName(folder)}</span>
-                    <span className="truncate text-[10px] text-dim">{shortenHome(folder)}</span>
-                    <span className="ml-auto shrink-0 text-[10px] text-dim">
+                    <span className="truncate text-[11px] text-dim">{shortenHome(folder)}</span>
+                    <span className="ml-auto shrink-0 text-[11px] text-dim">
                       {live > 0 && <span className="mr-1 text-success">●{live}</span>}
                       {items.length}
                     </span>
@@ -198,12 +198,12 @@ function SessionItem({
       <div className="truncate text-xs font-medium" title={titleOf(s)}>
         {titleOf(s)}
       </div>
-      <div className="mt-0.5 flex items-center gap-1.5 text-[10px] text-dim">
+      <div className="mt-0.5 flex items-center gap-1.5 text-[11px] text-dim">
         <LiveBadge session={s} />
         <SubagentBadge session={s} />
-        <span>{formatAgo(s.updatedAt)}</span>
-        {s.live?.memoryKb != null && <span className="text-muted">{formatMemory(s.live.memoryKb)}</span>}
-        {showFolder && <span className="truncate">{shortenHome(folderOf(s))}</span>}
+        <span className="shrink-0 whitespace-nowrap">{formatAgo(s.updatedAt)}</span>
+        {s.live?.memoryKb != null && <span className="shrink-0 whitespace-nowrap text-muted">{formatMemory(s.live.memoryKb)}</span>}
+        {showFolder && <span className="min-w-0 truncate">{shortenHome(folderOf(s))}</span>}
       </div>
     </button>
   );

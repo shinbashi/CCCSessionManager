@@ -56,7 +56,7 @@ export function SessionDetail({ session: s, focusUuid, onChanged, onOpenParent }
           <SubagentBadge session={s} />
         </div>
 
-        <dl className="grid grid-cols-[auto_1fr] gap-x-3 gap-y-0.5 text-[11px]">
+        <dl className="grid grid-cols-[auto_1fr] gap-x-3 gap-y-0.5 text-xs">
           <dt className="text-dim">フォルダ</dt>
           <dd className="truncate font-mono text-muted">{shortenHome(s.cwd ?? s.projectDir)}</dd>
           <dt className="text-dim">セッション</dt>

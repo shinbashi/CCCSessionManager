@@ -80,13 +80,13 @@ export function SearchView({ sessions, onOpen }: Props) {
         </form>
 
         <div className="flex flex-wrap items-center gap-1.5">
-          <span className="text-[11px] text-dim">種類</span>
+          <span className="text-xs text-dim">種類</span>
           {BLOCK_KINDS.map(({ kind, label, color }) => (
             <Chip key={kind} active={kinds.has(kind)} color={color} onClick={() => toggleKind(kind)}>
               {label}
             </Chip>
           ))}
-          <span className="ml-3 text-[11px] text-dim">セッション</span>
+          <span className="ml-3 text-xs text-dim">セッション</span>
           {(
             [
               ["all", "すべて"],
@@ -104,7 +104,7 @@ export function SearchView({ sessions, onOpen }: Props) {
         </div>
 
         {result && (
-          <p className="text-[11px] text-dim">
+          <p className="text-xs text-dim">
             「{result.query}」{result.total.toLocaleString()} 件ヒット
             {result.total > result.hits.length && `（新しい ${result.hits.length} 件を表示）`}・絞り込み後 {visible.length} 件
           </p>
@@ -127,12 +127,12 @@ export function SearchView({ sessions, onOpen }: Props) {
                 <span className="truncate text-xs font-medium">{titleOf(s)}</span>
                 <LiveBadge session={s} />
                 <SubagentBadge session={s} />
-                <span className="ml-auto shrink-0 text-[10px] text-dim">{formatTime(h.timestamp)}</span>
+                <span className="ml-auto shrink-0 text-[11px] text-dim">{formatTime(h.timestamp)}</span>
               </div>
               <div className="mt-1 text-xs break-words text-muted">
                 <Highlight text={h.snippet} query={result?.query ?? ""} />
               </div>
-              <div className="mt-0.5 truncate font-mono text-[10px] text-dim">{shortenHome(s.cwd ?? s.projectDir)}</div>
+              <div className="mt-0.5 truncate font-mono text-[11px] text-dim">{shortenHome(s.cwd ?? s.projectDir)}</div>
             </button>
           );
         })}

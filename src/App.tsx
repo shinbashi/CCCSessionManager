@@ -48,7 +48,7 @@ function App() {
       {/* タイトルバーは Overlay なので、ヘッダーをドラッグ領域にし、左に信号機ボタン分の余白を取る (html の font-size が 13px なので rem ではなく px で指定) */}
       <header data-tauri-drag-region className="flex h-11 shrink-0 items-center gap-3 border-b border-line bg-panel pr-4 pl-[84px] select-none">
         <h1 data-tauri-drag-region className="text-sm font-bold tracking-wide">
-          <span className="text-accent drop-shadow-[0_0_8px_var(--accent)]">Claude</span> Sessions
+          <span className="text-accent drop-shadow-[0_0_8px_var(--accent)]">CCC</span>SessionManager
         </h1>
         <nav className="flex overflow-hidden rounded border border-line text-xs">
           {(

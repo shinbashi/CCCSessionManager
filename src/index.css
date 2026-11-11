@@ -1,37 +1,37 @@
 @import "tailwindcss";
 
 /*
- * ネオン調のダークテーマ。値は Claude Code History Viewer の .dark を参考にしている。
+ * ネオン調のダークテーマ。Claude Code History Viewer の .dark を参考に、色相と明度を調整している。
  * 濃紺の背景 + 明度の高い鮮やかなアクセント + 発光する影 (glow)。
  */
 :root {
   color-scheme: dark;
 
-  --bg: oklch(0.12 0.015 260);
-  --panel: oklch(0.145 0.015 260);
-  --card: oklch(0.16 0.015 260);
-  --card-hover: oklch(0.2 0.02 260);
-  --border: oklch(0.25 0.015 260);
-  --fg: oklch(0.93 0.01 240);
-  --muted: oklch(0.78 0.02 240);
-  --dim: oklch(0.6 0.02 250);
+  --bg: oklch(0.125 0.018 266);
+  --panel: oklch(0.15 0.018 266);
+  --card: oklch(0.168 0.019 266);
+  --card-hover: oklch(0.21 0.024 264);
+  --border: oklch(0.265 0.02 264);
+  --fg: oklch(0.94 0.008 250);
+  --muted: oklch(0.77 0.025 248);
+  --dim: oklch(0.61 0.025 256);
 
-  --accent: oklch(0.72 0.14 250);
-  --success: oklch(0.78 0.16 145);
-  --warning: oklch(0.82 0.16 75);
-  --danger: oklch(0.72 0.18 25);
-  --info: oklch(0.75 0.16 240);
+  --accent: oklch(0.74 0.15 242);
+  --success: oklch(0.8 0.17 150);
+  --warning: oklch(0.83 0.15 80);
+  --danger: oklch(0.7 0.19 20);
+  --info: oklch(0.77 0.14 230);
 
   /* 発言の種類ごとの色 */
   --kind-user: var(--info);
   --kind-assistant: var(--warning);
-  --kind-thinking: oklch(0.85 0.1 85);
-  --kind-tool-use: oklch(0.78 0.14 310);
-  --kind-tool-result: oklch(0.78 0.14 160);
+  --kind-thinking: oklch(0.86 0.09 92);
+  --kind-tool-use: oklch(0.77 0.15 302);
+  --kind-tool-result: oklch(0.79 0.13 170);
 
-  --glow-green: 0 0 16px oklch(0.75 0.18 145 / 0.45);
-  --glow-blue: 0 0 16px oklch(0.7 0.15 250 / 0.45);
-  --glow-amber: 0 0 16px oklch(0.8 0.18 55 / 0.45);
+  --glow-green: 0 0 16px oklch(0.78 0.18 150 / 0.45);
+  --glow-blue: 0 0 16px oklch(0.72 0.15 242 / 0.45);
+  --glow-amber: 0 0 16px oklch(0.82 0.17 70 / 0.45);
 }
 
 @theme inline {
@@ -66,6 +66,10 @@ body,
   background: var(--bg);
   color: var(--fg);
   font-family: -apple-system, BlinkMacSystemFont, "Hiragino Sans", sans-serif;
+}
+
+/* rem の基準 (html) は 16px のまま、本文だけ macOS 標準の 13px にする */
+body {
   font-size: 13px;
 }
 
@@ -76,14 +80,176 @@ body,
     var(--glow-blue);
 }
 
+/* キーボード操作時のフォーカス枠も配色に合わせる (既定は macOS のシステム色) */
+:focus-visible {
+  outline: 1px solid var(--accent);
+  outline-offset: -1px;
+}
+
 ::-webkit-scrollbar {
   width: 10px;
   height: 10px;
 }
 ::-webkit-scrollbar-thumb {
-  background: oklch(0.3 0.02 260);
+  background: var(--border);
   border-radius: 5px;
 }
 ::-webkit-scrollbar-track {
   background: transparent;
+}
+
+/* ===== 会話ビューアの Markdown 表示 ===== */
+.md {
+  overflow-wrap: anywhere;
+}
+.md > :first-child {
+  margin-top: 0;
+}
+.md > :last-child {
+  margin-bottom: 0;
+}
+.md p,
+.md ul,
+.md ol,
+.md pre,
+.md table,
+.md blockquote {
+  margin: 0.5em 0;
+}
+.md h1,
+.md h2,
+.md h3,
+.md h4 {
+  margin: 0.9em 0 0.4em;
+  font-weight: 700;
+  line-height: 1.35;
+}
+.md h1 {
+  font-size: 1.3em;
+}
+.md h2 {
+  font-size: 1.18em;
+}
+.md h3 {
+  font-size: 1.06em;
+}
+.md ul {
+  list-style: disc;
+  padding-left: 1.4em;
+}
+.md ol {
+  list-style: decimal;
+  padding-left: 1.6em;
+}
+.md li + li {
+  margin-top: 0.15em;
+}
+.md strong {
+  color: var(--fg);
+  font-weight: 700;
+}
+.md a {
+  color: var(--accent);
+  text-decoration: underline;
+  text-decoration-color: color-mix(in oklch, var(--accent) 45%, transparent);
+  text-underline-offset: 2px;
+  cursor: pointer;
+}
+.md a:hover {
+  text-decoration-color: var(--accent);
+}
+.md blockquote {
+  border-left: 3px solid var(--border);
+  padding-left: 0.8em;
+  color: var(--muted);
+}
+.md hr {
+  border: 0;
+  border-top: 1px solid var(--border);
+  margin: 0.8em 0;
+}
+.md table {
+  border-collapse: collapse;
+  font-size: 0.95em;
+  display: block;
+  overflow-x: auto;
+}
+.md th,
+.md td {
+  border: 1px solid var(--border);
+  padding: 0.25em 0.6em;
+  text-align: left;
+}
+.md th {
+  background: var(--card-hover);
+}
+.md code {
+  font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+  font-size: 0.92em;
+}
+.md :not(pre) > code {
+  background: var(--card-hover);
+  border: 1px solid var(--border);
+  border-radius: 4px;
+  padding: 0.05em 0.35em;
+}
+.md pre {
+  background: var(--bg);
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  padding: 0.6em 0.8em;
+  font-size: 12px;
+  line-height: 1.5;
+  white-space: pre-wrap;
+  color: var(--muted);
+}
+/* ツールのカードはコードブロックだけなので、枠を付けずにカードへなじませる */
+.md-tool > pre:only-child {
+  background: transparent;
+  border: 0;
+  padding: 0;
+}
+
+/* highlight.js のトークン色 (配色のトークンに合わせる) */
+.hljs-attr,
+.hljs-attribute,
+.hljs-property {
+  color: var(--info);
+}
+.hljs-string,
+.hljs-regexp {
+  color: var(--kind-tool-result);
+}
+.hljs-number,
+.hljs-literal,
+.hljs-symbol {
+  color: var(--warning);
+}
+.hljs-keyword,
+.hljs-selector-tag,
+.hljs-built_in,
+.hljs-type {
+  color: var(--kind-tool-use);
+}
+.hljs-title,
+.hljs-section,
+.hljs-name,
+.hljs-bullet {
+  color: var(--accent);
+}
+.hljs-comment,
+.hljs-meta,
+.hljs-quote {
+  color: var(--dim);
+  font-style: italic;
+}
+.hljs-addition {
+  color: var(--success);
+}
+.hljs-deletion {
+  color: var(--danger);
+}
+.hljs-variable,
+.hljs-template-variable {
+  color: var(--kind-thinking);
 }
