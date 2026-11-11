@@ -1,0 +1,89 @@
+@import "tailwindcss";
+
+/*
+ * ネオン調のダークテーマ。値は Claude Code History Viewer の .dark を参考にしている。
+ * 濃紺の背景 + 明度の高い鮮やかなアクセント + 発光する影 (glow)。
+ */
+:root {
+  color-scheme: dark;
+
+  --bg: oklch(0.12 0.015 260);
+  --panel: oklch(0.145 0.015 260);
+  --card: oklch(0.16 0.015 260);
+  --card-hover: oklch(0.2 0.02 260);
+  --border: oklch(0.25 0.015 260);
+  --fg: oklch(0.93 0.01 240);
+  --muted: oklch(0.78 0.02 240);
+  --dim: oklch(0.6 0.02 250);
+
+  --accent: oklch(0.72 0.14 250);
+  --success: oklch(0.78 0.16 145);
+  --warning: oklch(0.82 0.16 75);
+  --danger: oklch(0.72 0.18 25);
+  --info: oklch(0.75 0.16 240);
+
+  /* 発言の種類ごとの色 */
+  --kind-user: var(--info);
+  --kind-assistant: var(--warning);
+  --kind-thinking: oklch(0.85 0.1 85);
+  --kind-tool-use: oklch(0.78 0.14 310);
+  --kind-tool-result: oklch(0.78 0.14 160);
+
+  --glow-green: 0 0 16px oklch(0.75 0.18 145 / 0.45);
+  --glow-blue: 0 0 16px oklch(0.7 0.15 250 / 0.45);
+  --glow-amber: 0 0 16px oklch(0.8 0.18 55 / 0.45);
+}
+
+@theme inline {
+  --color-bg: var(--bg);
+  --color-panel: var(--panel);
+  --color-card: var(--card);
+  --color-card-hover: var(--card-hover);
+  --color-line: var(--border);
+  --color-fg: var(--fg);
+  --color-muted: var(--muted);
+  --color-dim: var(--dim);
+  --color-accent: var(--accent);
+  --color-success: var(--success);
+  --color-warning: var(--warning);
+  --color-danger: var(--danger);
+  --color-info: var(--info);
+  --color-kind-user: var(--kind-user);
+  --color-kind-assistant: var(--kind-assistant);
+  --color-kind-thinking: var(--kind-thinking);
+  --color-kind-tool-use: var(--kind-tool-use);
+  --color-kind-tool-result: var(--kind-tool-result);
+  --shadow-glow-green: var(--glow-green);
+  --shadow-glow-blue: var(--glow-blue);
+  --shadow-glow-amber: var(--glow-amber);
+}
+
+html,
+body,
+#root {
+  height: 100%;
+  margin: 0;
+  background: var(--bg);
+  color: var(--fg);
+  font-family: -apple-system, BlinkMacSystemFont, "Hiragino Sans", sans-serif;
+  font-size: 13px;
+}
+
+/* ネオンの縁取り: 選択中の行などに使う */
+.neon-ring {
+  box-shadow:
+    inset 0 0 0 1px color-mix(in oklch, var(--accent) 70%, transparent),
+    var(--glow-blue);
+}
+
+::-webkit-scrollbar {
+  width: 10px;
+  height: 10px;
+}
+::-webkit-scrollbar-thumb {
+  background: oklch(0.3 0.02 260);
+  border-radius: 5px;
+}
+::-webkit-scrollbar-track {
+  background: transparent;
+}
