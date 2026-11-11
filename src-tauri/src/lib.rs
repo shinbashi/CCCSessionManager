@@ -9,6 +9,21 @@ use history::{HistoryCache, SessionInfo};
 use std::path::PathBuf;
 use std::process::Command;
 use std::sync::Arc;
+use tauri::menu::{Menu, MenuItem, MenuItemKind};
+use tauri::Emitter;
+
+/// アプリメニューの「Check for Updates…」の ID。押されると画面側へ同名のイベントを送る
+const CHECK_UPDATES: &str = "check-updates";
+
+/// 既定のメニューの、アプリ名のメニュー (About の下) に「Check for Updates…」を足す
+fn build_menu(app: &tauri::AppHandle) -> tauri::Result<Menu<tauri::Wry>> {
+    let menu = Menu::default(app)?;
+    if let Some(MenuItemKind::Submenu(app_menu)) = menu.items()?.into_iter().next() {
+        let item = MenuItem::with_id(app, CHECK_UPDATES, "Check for Updates…", true, None::<&str>)?;
+        app_menu.insert(&item, 1)?;
+    }
+    Ok(menu)
+}
 
 /// Finder から起動すると PATH に cmux が無いため、アプリ同梱の CLI を優先する
 const CMUX_BUNDLED: &str = "/Applications/cmux.app/Contents/Resources/bin/cmux";
@@ -275,6 +290,12 @@ pub fn run() {
         // 自動アップデート (GitHub Releases の latest.json を見る) と、更新後の再起動
         .plugin(tauri_plugin_updater::Builder::new().build())
         .plugin(tauri_plugin_process::init())
+        .menu(build_menu)
+        .on_menu_event(|app, event| {
+            if event.id() == CHECK_UPDATES {
+                let _ = app.emit(CHECK_UPDATES, ());
+            }
+        })
         .manage(Arc::new(HistoryCache::default()))
         .manage(Arc::new(suspended::SuspendedStore::new(suspended_store_path())))
         .plugin(tauri_plugin_opener::init())
