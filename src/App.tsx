@@ -9,7 +9,8 @@ type Mode = "sessions" | "search";
 
 function App() {
   const [sessions, setSessions] = useState<SessionInfo[]>([]);
-  const [loading, setLoading] = useState(false);
+  // 起動直後に空の一覧が一瞬見えないよう、読み込み中から始める
+  const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [mode, setMode] = useState<Mode>("sessions");
   const [selectedPath, setSelectedPath] = useState<string | null>(null);
@@ -82,7 +83,7 @@ function App() {
       {error && <p className="bg-danger/10 px-4 py-2 text-xs text-danger">{error}</p>}
 
       <div className="flex min-h-0 flex-1">
-        <Explorer sessions={sessions} selectedPath={selectedPath} onSelect={(s) => open(s)} />
+        <Explorer sessions={sessions} loading={loading} selectedPath={selectedPath} onSelect={(s) => open(s)} />
 
         {/* 検索結果を保つため、検索画面は隠すだけにする */}
         <div className={mode === "search" ? "flex min-w-0 flex-1" : "hidden"}>

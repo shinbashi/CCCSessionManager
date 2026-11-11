@@ -3,7 +3,7 @@ import { useEffect, useMemo, useRef, useState } from "react";
 import { BLOCK_KINDS, formatTime, kindInfo, loadFullBlock, loadTranscript, type Block, type BlockKind } from "../sessions";
 import { fence, toMarkdownSource, type Format } from "../format";
 import { Markdown } from "./Markdown";
-import { Chip, KindBadge } from "./ui";
+import { Chip, KindBadge, LoadingPane } from "./ui";
 
 type Props = {
   path: string;
@@ -139,9 +139,9 @@ export function ConversationView({ path, focusUuid }: Props) {
       </div>
 
       {error && <p className="px-4 py-2 text-xs text-danger">{error}</p>}
-      {!blocks && !error && <p className="px-4 py-6 text-xs text-dim">会話を読み込み中…</p>}
+      {!blocks && !error && <LoadingPane label="会話を読み込み中…" />}
 
-      <div className="relative flex min-h-0 flex-1 flex-col">
+      <div className={`relative min-h-0 flex-1 flex-col ${blocks ? "flex" : "hidden"}`}>
         <div ref={scrollRef} onScroll={onScroll} className="min-h-0 flex-1 overflow-y-auto">
           <div style={{ height: totalSize, position: "relative" }}>
             {virtualizer.getVirtualItems().map((item) => {

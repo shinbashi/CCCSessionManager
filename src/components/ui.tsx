@@ -59,6 +59,28 @@ export function Button({ tone = "default", className = "", ...rest }: ButtonProp
   );
 }
 
+/** 読み込み中を示すネオン調の回転する輪 (視差効果を減らす設定では回さない) */
+export function Spinner({ size = 28 }: { size?: number }) {
+  return (
+    <span
+      role="status"
+      aria-label="読み込み中"
+      className="inline-block animate-spin rounded-full border-2 border-accent/20 border-t-accent shadow-glow-blue motion-reduce:animate-none"
+      style={{ width: size, height: size }}
+    />
+  );
+}
+
+/** 中身を読み込んでいる間、空のペインの中央に出す */
+export function LoadingPane({ label }: { label: string }) {
+  return (
+    <div className="flex flex-1 flex-col items-center justify-center gap-3 py-10 text-xs text-dim">
+      <Spinner />
+      <span className="animate-pulse motion-reduce:animate-none">{label}</span>
+    </div>
+  );
+}
+
 /** 選択式の小さなトグル */
 export function Chip({ active, color, onClick, children }: { active: boolean; color?: string; onClick: () => void; children: ReactNode }) {
   const c = color ?? "var(--accent)";

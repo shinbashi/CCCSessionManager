@@ -14,7 +14,7 @@ import {
   type SessionInfo,
   type SortKey,
 } from "../sessions";
-import { Chip, LiveBadge, SubagentBadge } from "./ui";
+import { Chip, LiveBadge, LoadingPane, SubagentBadge } from "./ui";
 
 type View = "list" | "folder";
 type Prefs = { view: View; sort: SortKey; desc: boolean; kind: KindFilter; liveOnly: boolean };
@@ -32,11 +32,13 @@ function loadPrefs(): Prefs {
 
 type Props = {
   sessions: SessionInfo[];
+  /** 一覧を読み込み中か (まだ 1 件も無いときはローディング表示にする) */
+  loading: boolean;
   selectedPath: string | null;
   onSelect: (s: SessionInfo) => void;
 };
 
-export function Explorer({ sessions, selectedPath, onSelect }: Props) {
+export function Explorer({ sessions, loading, selectedPath, onSelect }: Props) {
   const [prefs, setPrefs] = useState<Prefs>(loadPrefs);
   const [text, setText] = useState("");
   const [openFolders, setOpenFolders] = useState<Set<string>>(new Set());
@@ -136,7 +138,8 @@ export function Explorer({ sessions, selectedPath, onSelect }: Props) {
         </div>
       </div>
 
-      <div className="flex-1 overflow-y-auto">
+      <div className="flex flex-1 flex-col overflow-y-auto">
+        {loading && sessions.length === 0 && <LoadingPane label="セッションを読み込み中…" />}
         {prefs.view === "list"
           ? visible.map((s) => (
               <SessionItem key={s.path} s={s} selected={s.path === selectedPath} onSelect={onSelect} showFolder />

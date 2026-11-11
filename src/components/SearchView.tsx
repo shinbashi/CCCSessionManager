@@ -10,7 +10,7 @@ import {
   type KindFilter,
   type SessionInfo,
 } from "../sessions";
-import { Button, Chip, KindBadge, LiveBadge, SubagentBadge } from "./ui";
+import { Button, Chip, KindBadge, LiveBadge, LoadingPane, SubagentBadge } from "./ui";
 
 type Props = {
   sessions: SessionInfo[];
@@ -112,8 +112,9 @@ export function SearchView({ sessions, onOpen }: Props) {
         {error && <p className="text-xs text-danger">{error}</p>}
       </div>
 
-      <div className="min-h-0 flex-1 overflow-y-auto">
-        {visible.map((h, i) => {
+      <div className="flex min-h-0 flex-1 flex-col overflow-y-auto">
+        {loading && <LoadingPane label="すべての会話を検索中…" />}
+        {!loading && visible.map((h, i) => {
           const s = byPath.get(h.path)!;
           return (
             <button
