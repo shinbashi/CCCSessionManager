@@ -31,6 +31,15 @@ export function fence(text: string, lang: string): string {
   return `${f}${lang}\n${text}\n${f}`;
 }
 
+/** 完全な JSON なら字下げして整形する。途中で切れているなどでパースできなければそのまま */
+function prettyJson(text: string): string {
+  try {
+    return JSON.stringify(JSON.parse(text), null, 2);
+  } catch {
+    return text;
+  }
+}
+
 /** 発言を、react-markdown に渡す Markdown 文字列にする */
 export function toMarkdownSource(block: Pick<Block, "kind" | "text">): { source: string; format: Format } {
   switch (block.kind) {
@@ -43,6 +52,7 @@ export function toMarkdownSource(block: Pick<Block, "kind" | "text">): { source:
     case "tool_result": {
       const format = detectFormat(block.text);
       if (format === "markdown") return { source: block.text, format };
+      if (format === "json") return { source: fence(prettyJson(block.text), "json"), format };
       return { source: fence(block.text, format === "plain" ? "text" : format), format };
     }
   }

@@ -91,17 +91,30 @@ async fn list_sessions(
     .map_err(|e| e.to_string())?
 }
 
+/// 画面から渡されたパスが ~/.claude/projects 以下の会話記録であることを確かめる
+fn transcript_path(path: &str) -> Result<PathBuf, String> {
+    let projects = claude_dir()?.join("projects").canonicalize().map_err(|e| e.to_string())?;
+    let target = PathBuf::from(path).canonicalize().map_err(|e| e.to_string())?;
+    if !target.starts_with(&projects) {
+        return Err(format!("{path} は ~/.claude/projects の外にあります"));
+    }
+    Ok(target)
+}
+
 /// 会話ビューア用に、1 セッションの全ブロックを読む
 #[tauri::command]
 async fn load_transcript(path: String) -> Result<Vec<messages::Block>, String> {
+    tauri::async_runtime::spawn_blocking(move || Ok(messages::load_blocks(&transcript_path(&path)?)))
+        .await
+        .map_err(|e| e.to_string())?
+}
+
+/// 省略して表示しているブロックの全文を読む
+#[tauri::command]
+async fn load_full_block(path: String, seq: usize, uuid: Option<String>) -> Result<String, String> {
     tauri::async_runtime::spawn_blocking(move || {
-        // ~/.claude/projects 以下のファイルだけを読む
-        let projects = claude_dir()?.join("projects").canonicalize().map_err(|e| e.to_string())?;
-        let target = PathBuf::from(&path).canonicalize().map_err(|e| e.to_string())?;
-        if !target.starts_with(&projects) {
-            return Err(format!("{path} は ~/.claude/projects の外にあります"));
-        }
-        Ok(messages::load_blocks(&target))
+        messages::load_full_text(&transcript_path(&path)?, seq, uuid.as_deref())
+            .ok_or_else(|| "会話記録が変わったため、全文を読み込めませんでした。会話を開き直してください".to_string())
     })
     .await
     .map_err(|e| e.to_string())?
@@ -265,6 +278,7 @@ pub fn run() {
         .invoke_handler(tauri::generate_handler![
             list_sessions,
             load_transcript,
+            load_full_block,
             search_messages,
             focus_session,
             hibernate_session,

@@ -29,19 +29,27 @@ pub struct Block {
     pub uuid: Option<String>,
     /// 表示用に text を切り詰めたか
     pub truncated: bool,
+    /// ファイル内でのブロックの通し番号 (全文を読み直すときに使う)。
+    /// 会話記録は追記のみなので、既存のブロックの番号は変わらない
+    pub seq: usize,
+}
+
+/// ファイル内の全ブロックを、切り詰めずに通し番号付きで順に返す
+fn blocks_in_file(path: &std::path::Path) -> impl Iterator<Item = Block> {
+    use std::io::{BufRead, BufReader};
+    std::fs::File::open(path)
+        .ok()
+        .into_iter()
+        .flat_map(|file| BufReader::new(file).lines().map_while(Result::ok))
+        .flat_map(|line| parse_line(&line))
+        .enumerate()
+        .map(|(seq, b)| Block { seq, ..b })
 }
 
 /// 会話ビューア用に、セッションの全ブロックを読む。長い text は切り詰める
 /// (ツールの入出力は 2,000 文字、それ以外は 20,000 文字まで)
 pub fn load_blocks(path: &std::path::Path) -> Vec<Block> {
-    use std::io::{BufRead, BufReader};
-    let Ok(file) = std::fs::File::open(path) else {
-        return Vec::new();
-    };
-    BufReader::new(file)
-        .lines()
-        .map_while(Result::ok)
-        .flat_map(|line| parse_line(&line))
+    blocks_in_file(path)
         .map(|mut b| {
             let max = match b.kind {
                 BlockKind::ToolUse | BlockKind::ToolResult => 2_000,
@@ -56,6 +64,15 @@ pub fn load_blocks(path: &std::path::Path) -> Vec<Block> {
         .collect()
 }
 
+/// 切り詰めたブロックの全文を読む。seq の位置のブロックが表示中のもの (uuid) と
+/// 一致しなければ None (会話記録が書き換わった場合など)
+pub fn load_full_text(path: &std::path::Path, seq: usize, uuid: Option<&str>) -> Option<String> {
+    blocks_in_file(path)
+        .nth(seq)
+        .filter(|b| b.uuid.as_deref() == uuid)
+        .map(|b| b.text)
+}
+
 pub fn parse_line(line: &str) -> Vec<Block> {
     let Ok(entry) = serde_json::from_str::<Value>(line) else {
         return Vec::new();
@@ -67,6 +84,7 @@ pub fn parse_line(line: &str) -> Vec<Block> {
         timestamp: entry["timestamp"].as_str().map(str::to_string),
         uuid: entry["uuid"].as_str().map(str::to_string),
         truncated: false,
+        seq: 0,
     };
     let content = &entry["message"]["content"];
     match entry["type"].as_str() {
@@ -361,6 +379,45 @@ mod tests {
         assert_eq!(b.len(), 2);
         assert_eq!((b[0].text.chars().count(), b[0].truncated), (2000, true));
         assert_eq!((b[1].text.chars().count(), b[1].truncated), (5000, false));
+    }
+
+    #[test]
+    fn load_blocks_numbers_blocks_in_file_order() {
+        let dir = tempfile::TempDir::new().unwrap();
+        let path = dir.path().join("s.jsonl");
+        // 1 行に 2 ブロック (text + tool_use) + 次の行に 1 ブロック
+        let a = r#"{"type":"assistant","uuid":"u1","message":{"content":[{"type":"text","text":"a"},{"type":"tool_use","name":"Bash","input":{}}]}}"#;
+        let b = r#"{"type":"user","uuid":"u2","message":{"content":"b"}}"#;
+        std::fs::write(&path, format!("{a}\n{b}\n")).unwrap();
+
+        let seqs: Vec<usize> = load_blocks(&path).iter().map(|b| b.seq).collect();
+
+        assert_eq!(seqs, vec![0, 1, 2]);
+    }
+
+    #[test]
+    fn load_full_text_returns_untruncated_text() {
+        let dir = tempfile::TempDir::new().unwrap();
+        let path = dir.path().join("s.jsonl");
+        let long = "x".repeat(5000);
+        let tool = format!(r#"{{"type":"user","uuid":"u1","message":{{"content":[{{"type":"tool_result","content":"{long}"}}]}}}}"#);
+        std::fs::write(&path, format!("{tool}\n")).unwrap();
+        let shown = &load_blocks(&path)[0];
+        assert!(shown.truncated);
+
+        let full = load_full_text(&path, shown.seq, shown.uuid.as_deref()).unwrap();
+
+        assert_eq!(full.chars().count(), 5000);
+    }
+
+    #[test]
+    fn load_full_text_rejects_mismatched_uuid() {
+        let dir = tempfile::TempDir::new().unwrap();
+        let path = dir.path().join("s.jsonl");
+        std::fs::write(&path, r#"{"type":"user","uuid":"u1","message":{"content":"a"}}"#).unwrap();
+
+        assert_eq!(load_full_text(&path, 0, Some("other")), None);
+        assert_eq!(load_full_text(&path, 5, Some("u1")), None);
     }
 
     #[test]

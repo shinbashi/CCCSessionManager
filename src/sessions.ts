@@ -34,6 +34,8 @@ export type Block = {
   timestamp: string | null;
   uuid: string | null;
   truncated: boolean;
+  /** ファイル内での通し番号。全文を読み直すときに使う */
+  seq: number;
 };
 
 export type Hit = {
@@ -51,6 +53,9 @@ export type SearchResult = { hits: Hit[]; total: number };
 
 export const listSessions = () => invoke<SessionInfo[]>("list_sessions");
 export const loadTranscript = (path: string) => invoke<Block[]>("load_transcript", { path });
+/** 省略して表示しているブロックの全文 */
+export const loadFullBlock = (path: string, block: Block) =>
+  invoke<string>("load_full_block", { path, seq: block.seq, uuid: block.uuid });
 export const searchMessages = (query: string, kinds: BlockKind[], limit = 500) =>
   invoke<SearchResult>("search_messages", { query, kinds, limit });
 export const focusSession = (c: CmuxLocation) =>

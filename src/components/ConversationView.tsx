@@ -1,6 +1,6 @@
 import { useVirtualizer } from "@tanstack/react-virtual";
 import { useEffect, useMemo, useRef, useState } from "react";
-import { BLOCK_KINDS, formatTime, kindInfo, loadTranscript, type Block, type BlockKind } from "../sessions";
+import { BLOCK_KINDS, formatTime, kindInfo, loadFullBlock, loadTranscript, type Block, type BlockKind } from "../sessions";
 import { fence, toMarkdownSource, type Format } from "../format";
 import { Markdown } from "./Markdown";
 import { Chip, KindBadge } from "./ui";
@@ -16,6 +16,15 @@ export function ConversationView({ path, focusUuid }: Props) {
   const [error, setError] = useState<string | null>(null);
   const [kinds, setKinds] = useState<Set<BlockKind>>(new Set(BLOCK_KINDS.map((k) => k.kind)));
   const scrollRef = useRef<HTMLDivElement>(null);
+  // 「全文を表示」で読み込んだ全文 (seq → text)。仮想スクロールでカードが作り直されても保つため、ここで持つ
+  const [fullTexts, setFullTexts] = useState<Map<number, string | null>>(new Map());
+  const setFull = (seq: number, text: string | null) =>
+    setFullTexts((cur) => {
+      const next = new Map(cur);
+      if (text === null) next.delete(seq);
+      else next.set(seq, text);
+      return next;
+    });
 
   useEffect(() => {
     let cancelled = false;
@@ -85,7 +94,13 @@ export function ConversationView({ path, focusUuid }: Props) {
                 className="absolute inset-x-0 px-4 py-1.5"
                 style={{ transform: `translateY(${item.start}px)` }}
               >
-                <BlockCard block={b} focused={!!focusUuid && b.uuid === focusUuid} />
+                <BlockCard
+                  block={b}
+                  focused={!!focusUuid && b.uuid === focusUuid}
+                  fullText={fullTexts.get(b.seq) ?? null}
+                  onLoadFull={() => loadFullBlock(path, b).then((t) => setFull(b.seq, t))}
+                  onCollapse={() => setFull(b.seq, null)}
+                />
               </div>
             );
           })}
@@ -97,10 +112,30 @@ export function ConversationView({ path, focusUuid }: Props) {
 
 const FORMAT_LABEL: Record<Format, string> = { markdown: "Markdown", json: "JSON", yaml: "YAML", plain: "テキスト" };
 
-function BlockCard({ block, focused }: { block: Block; focused: boolean }) {
+type CardProps = {
+  block: Block;
+  focused: boolean;
+  /** 読み込み済みの全文 (省略表示中は null) */
+  fullText: string | null;
+  onLoadFull: () => Promise<void>;
+  onCollapse: () => void;
+};
+
+function BlockCard({ block, focused, fullText, onLoadFull, onCollapse }: CardProps) {
   const { color } = kindInfo(block.kind);
   const tool = block.kind === "tool_use" || block.kind === "tool_result";
-  const { source, format } = useMemo(() => toMarkdownSource(block), [block]);
+  // 全文も省略表示と同じ経路 (形式の判定 → Markdown 描画) を通す
+  const text = fullText ?? block.text;
+  const { source, format } = useMemo(() => toMarkdownSource({ kind: block.kind, text }), [block.kind, text]);
+  const [loading, setLoading] = useState(false);
+  const [loadError, setLoadError] = useState<string | null>(null);
+  const loadFull = () => {
+    setLoading(true);
+    setLoadError(null);
+    onLoadFull()
+      .catch((e) => setLoadError(String(e)))
+      .finally(() => setLoading(false));
+  };
   // 自動判定が外れたときのために、原文 (整形しない表示) に切り替えられるようにする
   const [raw, setRaw] = useState(false);
   return (
@@ -125,14 +160,42 @@ function BlockCard({ block, focused }: { block: Block; focused: boolean }) {
           </button>
         )}
       </div>
-      <div className={`${tool ? "max-h-72 overflow-y-auto" : ""} ${block.kind === "thinking" ? "text-kind-thinking/90 italic" : ""}`}>
+      <div
+        className={`${tool ? (fullText ? "max-h-[70vh] overflow-y-auto" : "max-h-72 overflow-y-auto") : ""} ${
+          block.kind === "thinking" ? "text-kind-thinking/90 italic" : ""
+        }`}
+      >
         {raw ? (
-          <Markdown source={fence(block.text, "text")} className={tool ? "md-tool" : ""} />
+          <Markdown source={fence(text, "text")} className={tool ? "md-tool" : ""} />
         ) : (
           <Markdown source={source} className={tool ? "md-tool" : "text-[13px] leading-relaxed"} />
         )}
       </div>
-      {block.truncated && <div className="mt-1 text-[11px] text-dim">…（長いため省略しました）</div>}
+      {block.truncated && (
+        <div className="mt-1.5 flex items-center gap-2 text-[11px] text-dim">
+          {fullText === null ? (
+            <>
+              <span>…（長いため省略しました）</span>
+              <button
+                type="button"
+                disabled={loading}
+                onClick={loadFull}
+                className="rounded border border-line px-1.5 text-accent hover:bg-accent/10 disabled:opacity-50"
+              >
+                {loading ? "読み込み中…" : "全文を表示"}
+              </button>
+            </>
+          ) : (
+            <>
+              <span>全文（{fullText.length.toLocaleString()} 文字）を表示しています</span>
+              <button type="button" onClick={onCollapse} className="rounded border border-line px-1.5 hover:text-fg">
+                折りたたむ
+              </button>
+            </>
+          )}
+          {loadError && <span className="text-danger">{loadError}</span>}
+        </div>
+      )}
     </div>
   );
 }

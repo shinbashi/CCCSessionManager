@@ -54,6 +54,16 @@ describe("toMarkdownSource", () => {
     expect(toMarkdownSource(block("tool_use", '{"a":1}'))).toEqual({ source: '```json\n{"a":1}\n```', format: "json" });
   });
 
+  it("ツール結果が完全な JSON なら字下げして整形する (1 行に詰めた JSON も読めるように)", () => {
+    expect(toMarkdownSource(block("tool_result", '{"a":1,"b":[2]}')).source).toBe(
+      '```json\n{\n  "a": 1,\n  "b": [\n    2\n  ]\n}\n```',
+    );
+  });
+
+  it("途中で切れた JSON は整形せずそのまま", () => {
+    expect(toMarkdownSource(block("tool_result", '{"a":1,"b"')).source).toBe('```json\n{"a":1,"b"\n```');
+  });
+
   it("ツール結果は判定した形式で表示する", () => {
     expect(toMarkdownSource(block("tool_result", "a: 1\nb: 2")).source).toBe("```yaml\na: 1\nb: 2\n```");
     expect(toMarkdownSource(block("tool_result", "# 見出し"))).toEqual({ source: "# 見出し", format: "markdown" });
