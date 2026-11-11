@@ -124,7 +124,7 @@ fn list_candidates(projects_dir: &Path) -> Vec<Candidate> {
 }
 
 fn read_session(c: &Candidate) -> SessionInfo {
-    let summary = crate::transcript::summarize_file(&c.path);
+    let summary = crate::transcript::summarize_file(&c.path, &c.project_dir);
     let meta = (c.kind == SessionKind::Subagent).then(|| read_agent_meta(&c.path)).flatten();
     let description = meta.as_ref().and_then(|m| m["description"].as_str().map(str::to_string));
     SessionInfo {

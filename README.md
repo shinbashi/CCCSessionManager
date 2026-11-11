@@ -25,14 +25,16 @@ cmux で Claude Code のセッションを大量に動かしていると、ど�
 
 [Releases](https://github.com/shinbashi/CCCSessionManager/releases/latest) から `CCCSessionManager_<バージョン>_aarch64.dmg`（Apple Silicon 用）をダウンロードし、アプリを「アプリケーション」フォルダにドラッグしてください。
 
-このアプリは Apple の公証（notarization）を受けていないため、初回起動時に macOS に止められます。次のどちらかで開けるようになります。
+このアプリは Apple の公証（notarization）を受けていないため、初回起動時に「開発元を確認できない」として macOS に止められます。一度だけ次の操作で開けるようになります。
 
-- 「システム設定 → プライバシーとセキュリティ」の下部に出る「このまま開く」を押す
-- 「壊れているため開けません」と表示される場合は、ターミナルで次を実行する
+1. アプリを開こうとして、警告が出たら「完了」で閉じる
+2. 「システム設定 → プライバシーとセキュリティ」の下部に出る「このまま開く」を押す
 
-  ```sh
-  xattr -cr /Applications/CCCSessionManager.app
-  ```
+v0.2.2 以前の dmg で「壊れているため開けません」と表示される場合は、最新版をダウンロードし直してください（署名を修正しました）。それでも開けない場合は、ターミナルで次を実行します。
+
+```sh
+xattr -cr /Applications/CCCSessionManager.app
+```
 
 ### 自動アップデート
 

@@ -15,12 +15,22 @@ pub struct TranscriptSummary {
     last_prompt: Option<String>,
     /// 最初に記録された作業ディレクトリ
     cwd: Option<String>,
+    /// 記録が置かれているフォルダ名 (~/.claude/projects/<これ>)。起動したフォルダから作られる
+    project_dir: Option<String>,
+    /// 記録された作業ディレクトリのうち、project_dir と対応するもの (= 起動したフォルダ)
+    project_cwd: Option<String>,
     /// 最初に記録された時刻 (ISO 8601)
     first_timestamp: Option<String>,
 }
 
 impl TranscriptSummary {
+    /// project_dir (~/.claude/projects 直下のフォルダ名) を手がかりに、セッションのフォルダを決める
+    pub fn for_project(project_dir: &str) -> Self {
+        Self { project_dir: Some(project_dir.to_string()), ..Self::default() }
+    }
+
     pub fn feed(&mut self, line: &str) {
+        self.match_project_cwd(line);
         // 会話記録は数百MBになることがあるので、関係しそうな行だけを JSON として読む
         if !self.may_be_relevant(line) {
             return;
@@ -75,8 +85,26 @@ impl TranscriptSummary {
         self.last_prompt.as_deref()
     }
 
+    /// セッションのフォルダ。cwd は途中の cd で変わるので、記録の置き場所 (起動したフォルダ) と
+    /// 対応するものを優先し、見つからなければ最初の cwd にする
     pub fn cwd(&self) -> Option<&str> {
-        self.cwd.as_deref()
+        self.project_cwd.as_deref().or(self.cwd.as_deref())
+    }
+
+    /// 行の "cwd" が project_dir と対応していれば覚える。全行を JSON として読むと遅いので文字列で取り出す
+    fn match_project_cwd(&mut self, line: &str) {
+        let Some(dir) = self.project_dir.as_deref() else { return };
+        if self.project_cwd.is_some() {
+            return;
+        }
+        const KEY: &str = "\"cwd\":\"";
+        let Some(start) = line.find(KEY).map(|i| i + KEY.len()) else { return };
+        let Some(len) = line[start..].find('"') else { return };
+        let cwd = &line[start..start + len];
+        // エスケープを含むパスは文字列のままでは比べられないので対象外 (最初の cwd が使われる)
+        if !cwd.contains('\\') && project_dir_name(cwd) == dir {
+            self.project_cwd = Some(cwd.to_string());
+        }
     }
 
     pub fn first_timestamp(&self) -> Option<&str> {
@@ -92,10 +120,21 @@ impl TranscriptSummary {
     }
 }
 
-/// jsonl ファイルを 1 行ずつ読んで要約する
-pub fn summarize_file(path: &std::path::Path) -> TranscriptSummary {
+/// Claude Code が会話記録の置き場所 (~/.claude/projects/<これ>) に使う名前。
+/// 英数字以外を - にする。JavaScript と同じく UTF-16 の 1 単位ごとに置き換える
+pub fn project_dir_name(cwd: &str) -> String {
+    cwd.chars()
+        .flat_map(|c| {
+            let n = if c.is_ascii_alphanumeric() { 0 } else { c.len_utf16() };
+            std::iter::repeat_n('-', n).chain(c.is_ascii_alphanumeric().then_some(c))
+        })
+        .collect()
+}
+
+/// jsonl ファイルを 1 行ずつ読んで要約する。project_dir は ~/.claude/projects 直下のフォルダ名
+pub fn summarize_file(path: &std::path::Path, project_dir: &str) -> TranscriptSummary {
     use std::io::{BufRead, BufReader};
-    let mut summary = TranscriptSummary::default();
+    let mut summary = TranscriptSummary::for_project(project_dir);
     if let Ok(file) = std::fs::File::open(path) {
         for line in BufReader::new(file).lines().map_while(Result::ok) {
             summary.feed(&line);
@@ -217,6 +256,62 @@ mod tests {
         ]);
         assert_eq!(s.cwd(), Some("/Users/me/a"));
         assert_eq!(s.first_timestamp(), Some("2026-11-01T00:00:00.000Z"));
+    }
+
+    fn summarize_in(project_dir: &str, lines: &[&str]) -> TranscriptSummary {
+        let mut s = TranscriptSummary::for_project(project_dir);
+        for l in lines {
+            s.feed(l);
+        }
+        s
+    }
+
+    #[test]
+    fn project_dir_name_replaces_non_alphanumerics_like_claude_code() {
+        assert_eq!(project_dir_name("/Users/me/Development/My.App"), "-Users-me-Development-My-App");
+        assert_eq!(project_dir_name("/Users/me/.claude"), "-Users-me--claude");
+        assert_eq!(project_dir_name("/Users/me/全体"), "-Users-me---");
+        // JavaScript の文字列と同じく、BMP 外の文字 (絵文字など) は 2 文字分になる
+        assert_eq!(project_dir_name("/a/😀"), "-a---");
+    }
+
+    #[test]
+    fn cwd_is_the_one_matching_the_project_dir_even_after_cd() {
+        // 起動したフォルダで記録され、途中で cd しても変わらない
+        let s = summarize_in(
+            "-Users-me-a",
+            &[
+                r#"{"type":"user","cwd":"/Users/me/a","message":{"content":"hi"}}"#,
+                r#"{"type":"assistant","cwd":"/Users/me/a/sub","message":{"content":[]}}"#,
+            ],
+        );
+        assert_eq!(s.cwd(), Some("/Users/me/a"));
+    }
+
+    #[test]
+    fn cwd_follows_the_project_dir_when_the_session_was_moved() {
+        // 別のフォルダの記録をコピーして --resume した場合、前半は元のフォルダ
+        let s = summarize_in(
+            "-Users-me-b",
+            &[
+                r#"{"type":"user","cwd":"/Users/me/a","message":{"content":"hi"}}"#,
+                r#"{"type":"assistant","cwd":"/Users/me/a/x","message":{"content":[]}}"#,
+                r#"{"type":"user","cwd":"/Users/me/b","message":{"content":"next"}}"#,
+            ],
+        );
+        assert_eq!(s.cwd(), Some("/Users/me/b"));
+    }
+
+    #[test]
+    fn cwd_falls_back_to_the_first_one_when_none_matches() {
+        let s = summarize_in(
+            "-somewhere-else",
+            &[
+                r#"{"type":"user","cwd":"/Users/me/a","message":{"content":"hi"}}"#,
+                r#"{"type":"user","cwd":"/Users/me/b","message":{"content":"x"}}"#,
+            ],
+        );
+        assert_eq!(s.cwd(), Some("/Users/me/a"));
     }
 
     #[test]
