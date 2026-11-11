@@ -2,6 +2,7 @@ import { useCallback, useEffect, useMemo, useState } from "react";
 import { Explorer } from "./components/Explorer";
 import { SearchView } from "./components/SearchView";
 import { SessionDetail } from "./components/SessionDetail";
+import { UpdateBanner } from "./components/UpdateBanner";
 import { listSessions, type SessionInfo } from "./sessions";
 
 type Mode = "sessions" | "search";
@@ -76,6 +77,7 @@ function App() {
           {loading ? "読み込み中…" : "更新"}
         </button>
       </header>
+      <UpdateBanner />
 
       {error && <p className="bg-danger/10 px-4 py-2 text-xs text-danger">{error}</p>}
 

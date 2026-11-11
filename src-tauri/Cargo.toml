@@ -1,6 +1,6 @@
 [package]
 name = "ccc-session-manager"
-version = "0.1.0"
+version = "0.2.0"
 description = "A Tauri App"
 authors = ["you"]
 edition = "2024"
@@ -24,6 +24,7 @@ serde = { version = "1", features = ["derive"] }
 serde_json = "1"
 rayon = "1.12.0"
 aho-corasick = "1.1.5"
+tauri-plugin-process = "2"
 
 
 # Read the optimization guideline for more details: https://tauri.app/concept/size/#cargo-configuration
@@ -36,3 +37,6 @@ strip = true
 
 [dev-dependencies]
 tempfile = "3.27.0"
+
+[target.'cfg(not(any(target_os = "android", target_os = "ios")))'.dependencies]
+tauri-plugin-updater = "2"

@@ -1,0 +1,55 @@
+# v* のタグを push すると、macOS (Apple Silicon) 版をビルドして GitHub Releases に公開する。
+# 手動実行 (workflow_dispatch) は下書きのリリースを作るので、公開前の確認に使う。
+#
+# 必要な Secrets (自動アップデートの署名用。手元の ~/.tauri/cccsessionmanager.key*):
+#   TAURI_SIGNING_PRIVATE_KEY, TAURI_SIGNING_PRIVATE_KEY_PASSWORD
+name: Release
+
+on:
+  push:
+    tags:
+      - "v*"
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  release:
+    runs-on: macos-latest # Apple Silicon
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+
+      - uses: dtolnay/rust-toolchain@stable
+
+      - uses: Swatinem/rust-cache@v2
+        with:
+          workspaces: src-tauri
+
+      - run: npm ci
+
+      - name: テスト
+        run: |
+          npm test
+          cd src-tauri && cargo test --lib
+
+      - name: ビルドしてリリースに添付
+        uses: tauri-apps/tauri-action@v0
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          TAURI_SIGNING_PRIVATE_KEY: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY }}
+          TAURI_SIGNING_PRIVATE_KEY_PASSWORD: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY_PASSWORD }}
+        with:
+          tagName: v__VERSION__
+          releaseName: CCCSessionManager v__VERSION__
+          releaseBody: |
+            macOS (Apple Silicon) 版です。`CCCSessionManager_*_aarch64.dmg` をダウンロードしてインストールしてください。
+            初回起動時の警告については README の「インストール」を参照してください。
+          releaseDraft: ${{ github.event_name == 'workflow_dispatch' }}
+          prerelease: false
+          includeUpdaterJson: true

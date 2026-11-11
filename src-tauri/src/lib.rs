@@ -272,6 +272,9 @@ async fn terminate_session(pid: u32) -> Result<(), String> {
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
 pub fn run() {
     tauri::Builder::default()
+        // 自動アップデート (GitHub Releases の latest.json を見る) と、更新後の再起動
+        .plugin(tauri_plugin_updater::Builder::new().build())
+        .plugin(tauri_plugin_process::init())
         .manage(Arc::new(HistoryCache::default()))
         .manage(Arc::new(suspended::SuspendedStore::new(suspended_store_path())))
         .plugin(tauri_plugin_opener::init())

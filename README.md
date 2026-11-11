@@ -17,9 +17,26 @@ cmux で Claude Code のセッションを大量に動かしていると、ど�
 
 ## 動作環境
 
-- macOS（Apple Silicon で確認）
+- macOS（Apple Silicon）
 - Claude Code
 - cmux（タブへのジャンプ・休止・再開に使います。無くても一覧・検索・会話表示は使えます）
+
+## インストール
+
+[Releases](https://github.com/shinbashi/CCCSessionManager/releases/latest) から `CCCSessionManager_<バージョン>_aarch64.dmg`（Apple Silicon 用）をダウンロードし、アプリを「アプリケーション」フォルダにドラッグしてください。
+
+このアプリは Apple の公証（notarization）を受けていないため、初回起動時に macOS に止められます。次のどちらかで開けるようになります。
+
+- 「システム設定 → プライバシーとセキュリティ」の下部に出る「このまま開く」を押す
+- 「壊れているため開けません」と表示される場合は、ターミナルで次を実行する
+
+  ```sh
+  xattr -cr /Applications/CCCSessionManager.app
+  ```
+
+### 自動アップデート
+
+起動時に新しいバージョンがあるかを確認し、あれば画面上部に「更新して再起動」が表示されます。更新ファイルは署名を検証してからインストールします。
 
 ## ビルド
 
@@ -31,7 +48,16 @@ npm run tauri build -- --bundles app
 cp -R "src-tauri/target/release/bundle/macos/CCCSessionManager.app" /Applications/
 ```
 
-開発中は `npm run tauri dev` で起動できます。テストは `cd src-tauri && cargo test --lib` で実行します。
+開発中は `npm run tauri dev` で起動できます。テストは `npm test` と `cd src-tauri && cargo test --lib` で実行します。
+
+### リリース
+
+1. `package.json`・`src-tauri/Cargo.toml`・`src-tauri/tauri.conf.json` の `version` を上げてコミットする
+2. `git tag v<バージョン> && git push origin v<バージョン>` でタグを push する
+
+GitHub Actions（`.github/workflows/release.yml`）が dmg と自動アップデート用のファイル（`latest.json` など）をビルドし、Releases に公開します。Actions の画面から手動で実行すると、下書きのリリースを作ります。
+
+自動アップデートの署名には、リポジトリの Secrets `TAURI_SIGNING_PRIVATE_KEY` / `TAURI_SIGNING_PRIVATE_KEY_PASSWORD` を使います。秘密鍵を失うと、配布済みのアプリに更新を届けられなくなります。
 
 ## 仕組み
 
