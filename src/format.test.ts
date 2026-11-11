@@ -71,6 +71,25 @@ describe("toMarkdownSource", () => {
   });
 });
 
+describe("toMarkdownSource: --- / === の行で見出しにしない", () => {
+  const block = (kind: string, text: string) => ({ kind, text }) as Parameters<typeof toMarkdownSource>[0];
+
+  it("文章の直後の --- は区切り線にする (setext 見出しにしない)", () => {
+    expect(toMarkdownSource(block("tool_result", "# 一覧\n2381 yamashita\n---\n| a | b |")).source).toBe(
+      "# 一覧\n2381 yamashita\n\n---\n| a | b |",
+    );
+  });
+
+  it("文章の直後の === も見出しにしない", () => {
+    expect(toMarkdownSource(block("assistant", "結果\n===")).source).toBe("結果\n\n===");
+  });
+
+  it("コードブロックの中と、表の区切り行はそのまま", () => {
+    const src = "```\na\n---\n```\n| a |\n|---|";
+    expect(toMarkdownSource(block("assistant", src)).source).toBe(src);
+  });
+});
+
 describe("splitUrls", () => {
   it("URL とそれ以外に分ける", () => {
     expect(splitUrls("see https://example.com/a?b=1 now")).toEqual([

@@ -40,18 +40,39 @@ function prettyJson(text: string): string {
   }
 }
 
+const SETEXT_UNDERLINE = /^ {0,3}(-+|=+)\s*$/;
+const FENCE_LINE = /^ {0,3}(`{3,}|~{3,})/;
+
+/**
+ * 文章の直後の --- / === 行は、Markdown では直前の行を見出し (setext 見出し) にしてしまう。
+ * ログでは区切り線 (echo --- など) として使われることが多いので、前に空行を入れて見出しにしない。
+ * コードブロックの中は変えない
+ */
+function avoidSetextHeadings(text: string): string {
+  const out: string[] = [];
+  let fence: string | null = null;
+  for (const line of text.split("\n")) {
+    const f = line.match(FENCE_LINE)?.[1];
+    if (f && (fence === null || f.startsWith(fence))) fence = fence === null ? f : null;
+    const prev = out[out.length - 1];
+    if (fence === null && SETEXT_UNDERLINE.test(line) && prev !== undefined && prev.trim() !== "") out.push("");
+    out.push(line);
+  }
+  return out.join("\n");
+}
+
 /** 発言を、react-markdown に渡す Markdown 文字列にする */
 export function toMarkdownSource(block: Pick<Block, "kind" | "text">): { source: string; format: Format } {
   switch (block.kind) {
     case "user":
     case "assistant":
     case "thinking":
-      return { source: block.text, format: "markdown" };
+      return { source: avoidSetextHeadings(block.text), format: "markdown" };
     case "tool_use":
       return { source: fence(block.text, "json"), format: "json" };
     case "tool_result": {
       const format = detectFormat(block.text);
-      if (format === "markdown") return { source: block.text, format };
+      if (format === "markdown") return { source: avoidSetextHeadings(block.text), format };
       if (format === "json") return { source: fence(prettyJson(block.text), "json"), format };
       return { source: fence(block.text, format === "plain" ? "text" : format), format };
     }

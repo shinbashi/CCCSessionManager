@@ -11,6 +11,20 @@ type Props = {
   focusUuid?: string | null;
 };
 
+type Order = "asc" | "desc";
+const ORDER_KEY = "conversation-order";
+
+function loadOrder(): Order {
+  try {
+    return localStorage.getItem(ORDER_KEY) === "desc" ? "desc" : "asc";
+  } catch {
+    return "asc";
+  }
+}
+
+/** スクロール位置が端にあるとみなす余白 (px) */
+const EDGE = 24;
+
 export function ConversationView({ path, focusUuid }: Props) {
   const [blocks, setBlocks] = useState<Block[] | null>(null);
   const [error, setError] = useState<string | null>(null);
@@ -44,7 +58,21 @@ export function ConversationView({ path, focusUuid }: Props) {
     return c;
   }, [blocks]);
 
-  const visible = useMemo(() => (blocks ?? []).filter((b) => kinds.has(b.kind)), [blocks, kinds]);
+  // 昇順 = 古い発言が上、降順 = 新しい発言が上
+  const [order, setOrder] = useState<Order>(loadOrder);
+  const changeOrder = (next: Order) => {
+    setOrder(next);
+    try {
+      localStorage.setItem(ORDER_KEY, next);
+    } catch {
+      // 保存できなくても表示には影響しない
+    }
+  };
+
+  const visible = useMemo(() => {
+    const filtered = (blocks ?? []).filter((b) => kinds.has(b.kind));
+    return order === "desc" ? filtered.reverse() : filtered;
+  }, [blocks, kinds, order]);
 
   const virtualizer = useVirtualizer({
     count: visible.length,
@@ -53,12 +81,35 @@ export function ConversationView({ path, focusUuid }: Props) {
     overscan: 8,
   });
 
+  const scrollToTop = () => virtualizer.scrollToIndex(0, { align: "start" });
+  const scrollToBottom = () => virtualizer.scrollToIndex(visible.length - 1, { align: "end" });
+
+  // 開いたとき・並び順を変えたときは、最新の発言が見える位置へ (昇順なら一番下、降順なら一番上)。
   // 検索結果から来たときは該当ブロックへ
+  const loaded = blocks !== null;
   useEffect(() => {
-    if (!focusUuid || visible.length === 0) return;
-    const index = visible.findIndex((b) => b.uuid === focusUuid);
-    if (index >= 0) virtualizer.scrollToIndex(index, { align: "center" });
-  }, [focusUuid, visible, virtualizer]);
+    if (!loaded || visible.length === 0) return;
+    if (focusUuid) {
+      const index = visible.findIndex((b) => b.uuid === focusUuid);
+      if (index >= 0) virtualizer.scrollToIndex(index, { align: "center" });
+      return;
+    }
+    if (order === "asc") virtualizer.scrollToIndex(visible.length - 1, { align: "end" });
+    else virtualizer.scrollToIndex(0, { align: "start" });
+    // 種類の絞り込みを変えたときに位置が飛ばないよう、visible は依存に入れない
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [loaded, order, focusUuid]);
+
+  // 端にいるときは、その方向へのボタンを隠す
+  const [edge, setEdge] = useState({ top: true, bottom: true });
+  const onScroll = () => {
+    const el = scrollRef.current;
+    if (!el) return;
+    setEdge({ top: el.scrollTop <= EDGE, bottom: el.scrollTop + el.clientHeight >= el.scrollHeight - EDGE });
+  };
+  // 読み込みや絞り込みで高さが変わったときも判定し直す
+  const totalSize = virtualizer.getTotalSize();
+  useEffect(onScroll, [visible, totalSize]);
 
   const toggle = (k: BlockKind) =>
     setKinds((cur) => {
@@ -77,36 +128,71 @@ export function ConversationView({ path, focusUuid }: Props) {
           </Chip>
         ))}
         <span className="ml-auto text-xs text-dim">{blocks ? `${visible.length} 件表示` : ""}</span>
+        <button
+          type="button"
+          onClick={() => changeOrder(order === "asc" ? "desc" : "asc")}
+          className="rounded border border-line px-2 py-0.5 text-xs whitespace-nowrap text-muted hover:bg-card-hover hover:text-fg"
+          title={order === "asc" ? "古い発言が上 (クリックで新しい順)" : "新しい発言が上 (クリックで古い順)"}
+        >
+          {order === "asc" ? "↑ 昇順（古い順）" : "↓ 降順（新しい順）"}
+        </button>
       </div>
 
       {error && <p className="px-4 py-2 text-xs text-danger">{error}</p>}
       {!blocks && !error && <p className="px-4 py-6 text-xs text-dim">会話を読み込み中…</p>}
 
-      <div ref={scrollRef} className="min-h-0 flex-1 overflow-y-auto">
-        <div style={{ height: virtualizer.getTotalSize(), position: "relative" }}>
-          {virtualizer.getVirtualItems().map((item) => {
-            const b = visible[item.index];
-            return (
-              <div
-                key={item.key}
-                data-index={item.index}
-                ref={virtualizer.measureElement}
-                className="absolute inset-x-0 px-4 py-1.5"
-                style={{ transform: `translateY(${item.start}px)` }}
-              >
-                <BlockCard
-                  block={b}
-                  focused={!!focusUuid && b.uuid === focusUuid}
-                  fullText={fullTexts.get(b.seq) ?? null}
-                  onLoadFull={() => loadFullBlock(path, b).then((t) => setFull(b.seq, t))}
-                  onCollapse={() => setFull(b.seq, null)}
-                />
-              </div>
-            );
-          })}
+      <div className="relative flex min-h-0 flex-1 flex-col">
+        <div ref={scrollRef} onScroll={onScroll} className="min-h-0 flex-1 overflow-y-auto">
+          <div style={{ height: totalSize, position: "relative" }}>
+            {virtualizer.getVirtualItems().map((item) => {
+              const b = visible[item.index];
+              return (
+                <div
+                  key={item.key}
+                  data-index={item.index}
+                  ref={virtualizer.measureElement}
+                  className="absolute inset-x-0 px-4 py-1.5"
+                  style={{ transform: `translateY(${item.start}px)` }}
+                >
+                  <BlockCard
+                    block={b}
+                    focused={!!focusUuid && b.uuid === focusUuid}
+                    fullText={fullTexts.get(b.seq) ?? null}
+                    onLoadFull={() => loadFullBlock(path, b).then((t) => setFull(b.seq, t))}
+                    onCollapse={() => setFull(b.seq, null)}
+                  />
+                </div>
+              );
+            })}
+          </div>
         </div>
+        {blocks && !edge.top && (
+          <JumpButton position="top" onClick={scrollToTop}>
+            ↑ 最上部へ
+          </JumpButton>
+        )}
+        {blocks && !edge.bottom && (
+          <JumpButton position="bottom" onClick={scrollToBottom}>
+            ↓ 最下部へ
+          </JumpButton>
+        )}
       </div>
     </div>
+  );
+}
+
+/** ビューワの上下中央に重ねて出す移動ボタン */
+function JumpButton({ position, onClick, children }: { position: "top" | "bottom"; onClick: () => void; children: string }) {
+  return (
+    <button
+      type="button"
+      onClick={onClick}
+      className={`absolute left-1/2 z-10 -translate-x-1/2 rounded-full border border-accent/60 bg-panel/90 px-3 py-1 text-xs text-accent shadow-glow-blue backdrop-blur hover:bg-accent/15 ${
+        position === "top" ? "top-2" : "bottom-3"
+      }`}
+    >
+      {children}
+    </button>
   );
 }
 
