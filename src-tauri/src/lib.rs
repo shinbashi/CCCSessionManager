@@ -135,6 +135,14 @@ async fn load_full_block(path: String, seq: usize, uuid: Option<String>) -> Resu
     .map_err(|e| e.to_string())?
 }
 
+/// 会話ビューアの ⌘F 用に、1 セッションの全文から query を含むブロックの seq を返す
+#[tauri::command]
+async fn find_in_transcript(path: String, query: String) -> Result<Vec<usize>, String> {
+    tauri::async_runtime::spawn_blocking(move || Ok(messages::find_in_file(&transcript_path(&path)?, &query)))
+        .await
+        .map_err(|e| e.to_string())?
+}
+
 /// 全セッションを全文検索する
 #[tauri::command]
 async fn search_messages(
@@ -303,6 +311,7 @@ pub fn run() {
             list_sessions,
             load_transcript,
             load_full_block,
+            find_in_transcript,
             search_messages,
             focus_session,
             hibernate_session,

@@ -73,6 +73,20 @@ pub fn load_full_text(path: &std::path::Path, seq: usize, uuid: Option<&str>) ->
         .map(|b| b.text)
 }
 
+/// 会話ビューアの ⌘F 用に、切り詰めずに全文で query を含むブロックの seq を返す
+/// (英字の大文字小文字は区別しない。全セッション検索と同じ判定)。
+/// seq はファイル全体の通し番号なので、行を読み飛ばさずに全行をブロックに分ける
+pub fn find_in_file(path: &std::path::Path, query: &str) -> Vec<usize> {
+    use aho_corasick::AhoCorasick;
+    if query.trim().is_empty() {
+        return Vec::new();
+    }
+    let Ok(matcher) = AhoCorasick::builder().ascii_case_insensitive(true).build([query]) else {
+        return Vec::new();
+    };
+    blocks_in_file(path).filter(|b| matcher.is_match(&b.text)).map(|b| b.seq).collect()
+}
+
 pub fn parse_line(line: &str) -> Vec<Block> {
     let Ok(entry) = serde_json::from_str::<Value>(line) else {
         return Vec::new();
@@ -411,6 +425,32 @@ mod tests {
     }
 
     #[test]
+    fn find_in_file_matches_text_beyond_the_truncated_part() {
+        let dir = tempfile::TempDir::new().unwrap();
+        let path = dir.path().join("s.jsonl");
+        // 表示では 2,000 文字で切られるツール結果の末尾にだけ検索語がある
+        let tool = format!(
+            r#"{{"type":"user","message":{{"content":[{{"type":"tool_result","content":"{}NeedleAtEnd"}}]}}}}"#,
+            "x".repeat(5000)
+        );
+        let other = r#"{"type":"user","message":{"content":"関係ない発言"}}"#;
+        let hit = r#"{"type":"assistant","message":{"content":[{"type":"text","text":"needleatend もある"}]}}"#;
+        std::fs::write(&path, format!("{tool}\n{other}\n{hit}\n")).unwrap();
+        assert!(!load_blocks(&path)[0].text.contains("NeedleAtEnd"));
+
+        assert_eq!(find_in_file(&path, "needleAtEnd"), vec![0, 2]);
+    }
+
+    #[test]
+    fn find_in_file_with_blank_query_finds_nothing() {
+        let dir = tempfile::TempDir::new().unwrap();
+        let path = dir.path().join("s.jsonl");
+        std::fs::write(&path, r#"{"type":"user","message":{"content":"a b"}}"#).unwrap();
+
+        assert_eq!(find_in_file(&path, " "), Vec::<usize>::new());
+    }
+
+    #[test]
     fn load_full_text_rejects_mismatched_uuid() {
         let dir = tempfile::TempDir::new().unwrap();
         let path = dir.path().join("s.jsonl");
@@ -460,6 +500,9 @@ fn real_largest_transcript() {
     let blocks = load_blocks(std::path::Path::new(&largest.path));
     let json = serde_json::to_string(&blocks).unwrap();
     println!("{} blocks, {} MB json, {:?}", blocks.len(), json.len() / 1_000_000, started.elapsed());
+    let started = std::time::Instant::now();
+    let found = find_in_file(std::path::Path::new(&largest.path), "error");
+    println!("find_in_file: {} hits, {:?}", found.len(), started.elapsed());
 }
 
 /// 画面確認用: MOCK_OUT=<dir> MOCK_SESSION=<jsonl> cargo test --lib dump_mock_blocks -- --ignored

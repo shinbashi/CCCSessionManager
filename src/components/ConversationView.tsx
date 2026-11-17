@@ -1,6 +1,6 @@
 import { useVirtualizer } from "@tanstack/react-virtual";
-import { useDeferredValue, useEffect, useMemo, useRef, useState } from "react";
-import { BLOCK_KINDS, formatTime, kindInfo, loadFullBlock, loadTranscript, type Block, type BlockKind } from "../sessions";
+import { useEffect, useMemo, useRef, useState } from "react";
+import { BLOCK_KINDS, findInTranscript, formatTime, kindInfo, loadFullBlock, loadTranscript, type Block, type BlockKind } from "../sessions";
 import { fence, queryPattern, toMarkdownSource, type Format } from "../format";
 import { Markdown } from "./Markdown";
 import { Chip, KindBadge, LoadingPane } from "./ui";
@@ -43,10 +43,29 @@ export function ConversationView({ path, focusUuid }: Props) {
   // ⌘F のログ内検索。Markdown に変換すると文字の位置がずれるので、移動の単位は発言にする
   const [findOpen, setFindOpen] = useState(false);
   const [query, setQuery] = useState("");
-  const deferredQuery = useDeferredValue(query);
   const [current, setCurrent] = useState(0);
   const findRef = useRef<HTMLInputElement>(null);
-  const highlight = findOpen ? deferredQuery : "";
+  // 省略した部分も探せるよう、全文での判定は Rust に任せる。大きな会話では 1 回 0.5 秒ほどかかるので、
+  // 入力が止まってから検索し、ハイライトと件数はその検索語にそろえる
+  const [searched, setSearched] = useState<{ query: string; seqs: Set<number> } | null>(null);
+  const highlight = findOpen && searched ? searched.query : "";
+  useEffect(() => {
+    if (!findOpen || !query.trim()) {
+      setSearched(null);
+      return;
+    }
+    let cancelled = false;
+    const timer = setTimeout(() => {
+      findInTranscript(path, query)
+        .then((seqs) => !cancelled && setSearched({ query, seqs: new Set(seqs) }))
+        .catch((e) => !cancelled && setError(String(e)));
+    }, 250);
+    // 次の入力が来たら、待ち中の検索も返ってくる途中の結果も捨てる
+    return () => {
+      cancelled = true;
+      clearTimeout(timer);
+    };
+  }, [findOpen, query, path]);
 
   useEffect(() => {
     const onKey = (e: KeyboardEvent) => {
@@ -104,12 +123,11 @@ export function ConversationView({ path, focusUuid }: Props) {
     overscan: 8,
   });
 
-  // 検索語を含む発言の位置 (visible の添字)。全文を読み込んだ発言は全文から探す
-  const matches = useMemo(() => {
-    const pattern = queryPattern(highlight);
-    if (!pattern) return [];
-    return visible.flatMap((b, i) => ((fullTexts.get(b.seq) ?? b.text).search(pattern) >= 0 ? [i] : []));
-  }, [visible, fullTexts, highlight]);
+  // 検索語を含む発言の位置 (visible の添字)
+  const matches = useMemo(
+    () => (searched ? visible.flatMap((b, i) => (searched.seqs.has(b.seq) ? [i] : [])) : []),
+    [visible, searched],
+  );
 
   const goToMatch = (n: number) => {
     if (matches.length === 0) return;
@@ -117,15 +135,26 @@ export function ConversationView({ path, focusUuid }: Props) {
     setCurrent(next);
     virtualizer.scrollToIndex(matches[next], { align: "center" });
   };
-  // 検索語を変えたら最初の一致へ
+  // 検索結果が届いたら最初の一致へ
   useEffect(() => {
     goToMatch(0);
-    // 全文の読み込みなどで一致が増えたときに位置が飛ばないよう、検索語の変化だけを見る
+    // 種類の絞り込みで位置が飛ばないよう、検索結果の変化だけを見る
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [highlight]);
+  }, [searched]);
   // 種類の絞り込みで一致が減ったときも範囲内に収める
   const currentMatch = Math.min(current, Math.max(matches.length - 1, 0));
   const currentIndex = matches.length > 0 ? matches[currentMatch] : -1;
+
+  // 今いる一致が省略した部分にしか無ければ、一致した文字が見えるよう全文を読み込む
+  const currentBlock = currentIndex >= 0 ? visible[currentIndex] : null;
+  useEffect(() => {
+    if (!currentBlock?.truncated || fullTexts.has(currentBlock.seq)) return;
+    if (currentBlock.text.search(queryPattern(highlight) ?? /$^/) >= 0) return;
+    loadFullBlock(path, currentBlock)
+      .then((t) => setFull(currentBlock.seq, t))
+      .catch((e) => setError(String(e)));
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [currentBlock]);
 
   const scrollToTop = () => virtualizer.scrollToIndex(0, { align: "start" });
   const scrollToBottom = () => virtualizer.scrollToIndex(visible.length - 1, { align: "end" });
@@ -204,7 +233,9 @@ export function ConversationView({ path, focusUuid }: Props) {
             className="flex-1 rounded border border-line bg-bg px-2 py-1 text-xs outline-none focus:border-accent focus:shadow-glow-blue"
           />
           <span className="text-xs whitespace-nowrap text-dim">
-            {highlight.trim() && (matches.length > 0 ? `${currentMatch + 1} / ${matches.length} 件の発言` : "見つかりません")}
+            {query.trim() && searched?.query !== query
+              ? "検索中…"
+              : highlight.trim() && (matches.length > 0 ? `${currentMatch + 1} / ${matches.length} 件の発言` : "見つかりません")}
           </span>
           <FindButton title="前の一致 (⇧Enter)" disabled={matches.length === 0} onClick={() => goToMatch(currentMatch - 1)}>
             ↑

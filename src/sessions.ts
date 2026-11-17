@@ -56,6 +56,8 @@ export const loadTranscript = (path: string) => invoke<Block[]>("load_transcript
 /** 省略して表示しているブロックの全文 */
 export const loadFullBlock = (path: string, block: Block) =>
   invoke<string>("load_full_block", { path, seq: block.seq, uuid: block.uuid });
+/** ⌘F 用: 1 セッションの全文 (省略した部分も含む) から、検索語を含むブロックの seq を返す */
+export const findInTranscript = (path: string, query: string) => invoke<number[]>("find_in_transcript", { path, query });
 export const searchMessages = (query: string, kinds: BlockKind[], limit = 500) =>
   invoke<SearchResult>("search_messages", { query, kinds, limit });
 export const focusSession = (c: CmuxLocation) =>
