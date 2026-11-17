@@ -1,7 +1,7 @@
 import { useVirtualizer } from "@tanstack/react-virtual";
-import { useEffect, useMemo, useRef, useState } from "react";
+import { useDeferredValue, useEffect, useMemo, useRef, useState } from "react";
 import { BLOCK_KINDS, formatTime, kindInfo, loadFullBlock, loadTranscript, type Block, type BlockKind } from "../sessions";
-import { fence, toMarkdownSource, type Format } from "../format";
+import { fence, queryPattern, toMarkdownSource, type Format } from "../format";
 import { Markdown } from "./Markdown";
 import { Chip, KindBadge, LoadingPane } from "./ui";
 
@@ -39,6 +39,29 @@ export function ConversationView({ path, focusUuid }: Props) {
       else next.set(seq, text);
       return next;
     });
+
+  // ⌘F のログ内検索。Markdown に変換すると文字の位置がずれるので、移動の単位は発言にする
+  const [findOpen, setFindOpen] = useState(false);
+  const [query, setQuery] = useState("");
+  const deferredQuery = useDeferredValue(query);
+  const [current, setCurrent] = useState(0);
+  const findRef = useRef<HTMLInputElement>(null);
+  const highlight = findOpen ? deferredQuery : "";
+
+  useEffect(() => {
+    const onKey = (e: KeyboardEvent) => {
+      if (!e.metaKey || e.shiftKey || e.altKey || e.ctrlKey || e.key.toLowerCase() !== "f") return;
+      e.preventDefault();
+      setFindOpen(true);
+      // 開いた直後は入力欄がまだ描画されていないので、次のフレームでフォーカスする
+      requestAnimationFrame(() => {
+        findRef.current?.focus();
+        findRef.current?.select();
+      });
+    };
+    window.addEventListener("keydown", onKey);
+    return () => window.removeEventListener("keydown", onKey);
+  }, []);
 
   useEffect(() => {
     let cancelled = false;
@@ -80,6 +103,29 @@ export function ConversationView({ path, focusUuid }: Props) {
     estimateSize: () => 90,
     overscan: 8,
   });
+
+  // 検索語を含む発言の位置 (visible の添字)。全文を読み込んだ発言は全文から探す
+  const matches = useMemo(() => {
+    const pattern = queryPattern(highlight);
+    if (!pattern) return [];
+    return visible.flatMap((b, i) => ((fullTexts.get(b.seq) ?? b.text).search(pattern) >= 0 ? [i] : []));
+  }, [visible, fullTexts, highlight]);
+
+  const goToMatch = (n: number) => {
+    if (matches.length === 0) return;
+    const next = (n + matches.length) % matches.length;
+    setCurrent(next);
+    virtualizer.scrollToIndex(matches[next], { align: "center" });
+  };
+  // 検索語を変えたら最初の一致へ
+  useEffect(() => {
+    goToMatch(0);
+    // 全文の読み込みなどで一致が増えたときに位置が飛ばないよう、検索語の変化だけを見る
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [highlight]);
+  // 種類の絞り込みで一致が減ったときも範囲内に収める
+  const currentMatch = Math.min(current, Math.max(matches.length - 1, 0));
+  const currentIndex = matches.length > 0 ? matches[currentMatch] : -1;
 
   const scrollToTop = () => virtualizer.scrollToIndex(0, { align: "start" });
   const scrollToBottom = () => virtualizer.scrollToIndex(visible.length - 1, { align: "end" });
@@ -138,6 +184,40 @@ export function ConversationView({ path, focusUuid }: Props) {
         </button>
       </div>
 
+      {findOpen && (
+        <div className="flex items-center gap-2 border-b border-line px-4 py-1.5">
+          <input
+            ref={findRef}
+            value={query}
+            onChange={(e) => setQuery(e.target.value)}
+            onKeyDown={(e) => {
+              // 日本語入力の確定の Enter では移動しない
+              if (e.nativeEvent.isComposing) return;
+              if (e.key === "Enter") {
+                e.preventDefault();
+                goToMatch(currentMatch + (e.shiftKey ? -1 : 1));
+              } else if (e.key === "Escape") {
+                setFindOpen(false);
+              }
+            }}
+            placeholder="この会話を検索（Enter で次、⇧Enter で前、Esc で閉じる）"
+            className="flex-1 rounded border border-line bg-bg px-2 py-1 text-xs outline-none focus:border-accent focus:shadow-glow-blue"
+          />
+          <span className="text-xs whitespace-nowrap text-dim">
+            {highlight.trim() && (matches.length > 0 ? `${currentMatch + 1} / ${matches.length} 件の発言` : "見つかりません")}
+          </span>
+          <FindButton title="前の一致 (⇧Enter)" disabled={matches.length === 0} onClick={() => goToMatch(currentMatch - 1)}>
+            ↑
+          </FindButton>
+          <FindButton title="次の一致 (Enter)" disabled={matches.length === 0} onClick={() => goToMatch(currentMatch + 1)}>
+            ↓
+          </FindButton>
+          <FindButton title="閉じる (Esc)" onClick={() => setFindOpen(false)}>
+            ×
+          </FindButton>
+        </div>
+      )}
+
       {error && <p className="px-4 py-2 text-xs text-danger">{error}</p>}
       {!blocks && !error && <LoadingPane label="会話を読み込み中…" />}
 
@@ -156,7 +236,9 @@ export function ConversationView({ path, focusUuid }: Props) {
                 >
                   <BlockCard
                     block={b}
-                    focused={!!focusUuid && b.uuid === focusUuid}
+                    focused={(!!focusUuid && b.uuid === focusUuid) || item.index === currentIndex}
+                    highlight={highlight}
+                    currentMatch={item.index === currentIndex}
                     fullText={fullTexts.get(b.seq) ?? null}
                     onLoadFull={() => loadFullBlock(path, b).then((t) => setFull(b.seq, t))}
                     onCollapse={() => setFull(b.seq, null)}
@@ -178,6 +260,20 @@ export function ConversationView({ path, focusUuid }: Props) {
         )}
       </div>
     </div>
+  );
+}
+
+function FindButton({ title, disabled, onClick, children }: { title: string; disabled?: boolean; onClick: () => void; children: string }) {
+  return (
+    <button
+      type="button"
+      title={title}
+      disabled={disabled}
+      onClick={onClick}
+      className="rounded border border-line px-2 py-0.5 text-xs text-muted hover:bg-card-hover hover:text-fg disabled:opacity-40"
+    >
+      {children}
+    </button>
   );
 }
 
@@ -205,9 +301,13 @@ type CardProps = {
   fullText: string | null;
   onLoadFull: () => Promise<void>;
   onCollapse: () => void;
+  /** ハイライトする検索語 */
+  highlight: string;
+  /** 検索で今いる発言か */
+  currentMatch: boolean;
 };
 
-function BlockCard({ block, focused, fullText, onLoadFull, onCollapse }: CardProps) {
+function BlockCard({ block, focused, fullText, onLoadFull, onCollapse, highlight, currentMatch }: CardProps) {
   const { color } = kindInfo(block.kind);
   const tool = block.kind === "tool_use" || block.kind === "tool_result";
   // 全文も省略表示と同じ経路 (形式の判定 → Markdown 描画) を通す
@@ -224,6 +324,15 @@ function BlockCard({ block, focused, fullText, onLoadFull, onCollapse }: CardPro
   };
   // 自動判定が外れたときのために、原文 (整形しない表示) に切り替えられるようにする
   const [raw, setRaw] = useState(false);
+  // ツールの結果は枠の中でスクロールするので、今いる発言なら最初の一致を枠の中で見える位置へ
+  const bodyRef = useRef<HTMLDivElement>(null);
+  useEffect(() => {
+    const body = bodyRef.current;
+    const mark = body?.querySelector("mark");
+    if (!currentMatch || !body || !mark || body.scrollHeight <= body.clientHeight) return;
+    const offset = mark.getBoundingClientRect().top - body.getBoundingClientRect().top;
+    body.scrollTop += offset - body.clientHeight / 2;
+  }, [currentMatch, highlight, raw, fullText]);
   return (
     <div
       className={`group rounded-md border border-line bg-card px-3 py-2 ${focused ? "neon-ring" : ""}`}
@@ -247,14 +356,15 @@ function BlockCard({ block, focused, fullText, onLoadFull, onCollapse }: CardPro
         )}
       </div>
       <div
+        ref={bodyRef}
         className={`${tool ? (fullText ? "max-h-[70vh] overflow-y-auto" : "max-h-72 overflow-y-auto") : ""} ${
           block.kind === "thinking" ? "text-kind-thinking/90 italic" : ""
         }`}
       >
         {raw ? (
-          <Markdown source={fence(text, "text")} className={tool ? "md-tool" : ""} />
+          <Markdown source={fence(text, "text")} className={tool ? "md-tool" : ""} highlight={highlight} />
         ) : (
-          <Markdown source={source} className={tool ? "md-tool" : "text-[13px] leading-relaxed"} />
+          <Markdown source={source} className={tool ? "md-tool" : "text-[13px] leading-relaxed"} highlight={highlight} />
         )}
       </div>
       {block.truncated && (

@@ -108,6 +108,13 @@ body {
 .md > :last-child {
   margin-bottom: 0;
 }
+/* ⌘F の検索で一致した文字 */
+.md mark {
+  border-radius: 2px;
+  background: oklch(0.83 0.15 80 / 0.4);
+  color: inherit;
+  box-shadow: 0 0 0 1px oklch(0.83 0.15 80 / 0.6);
+}
 .md p,
 .md ul,
 .md ol,

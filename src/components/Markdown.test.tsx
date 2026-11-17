@@ -46,4 +46,19 @@ describe("Markdown", () => {
     const out = html('<img src=x onerror="alert(1)">');
     expect(out).not.toContain("<img");
   });
+  it("検索語を <mark> で囲む (コードブロックの中も、元の表記のまま)", () => {
+    const out = renderToStaticMarkup(<Markdown source={"Error が出た\n\n```\nerror: x\n```"} highlight="error" />);
+    expect(out).toContain("<mark>Error</mark>");
+    expect(out).toContain("<mark>error</mark>");
+  });
+
+  it("リンク文字列の中の一致もハイライトし、リンクは保つ", () => {
+    const out = renderToStaticMarkup(<Markdown source="https://example.com/error" highlight="error" />);
+    expect(out).toContain('<a href="https://example.com/error"');
+    expect(out).toContain("<mark>error</mark>");
+  });
+
+  it("検索語が無ければ <mark> を付けない", () => {
+    expect(html("error")).not.toContain("<mark>");
+  });
 });

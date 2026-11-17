@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { detectFormat, fence, splitUrls, toMarkdownSource } from "./format";
+import { detectFormat, fence, splitByQuery, splitUrls, toMarkdownSource } from "./format";
 
 describe("detectFormat", () => {
   it("{ や [ で始まるものは JSON (途中で切れていても)", () => {
@@ -108,5 +108,32 @@ describe("splitUrls", () => {
 
   it("URL が無ければ 1 つのまま", () => {
     expect(splitUrls("no link")).toEqual([{ text: "no link" }]);
+  });
+});
+
+describe("splitByQuery", () => {
+  it("大文字小文字を区別せずに一致した部分を切り出し、元の表記を保つ", () => {
+    expect(splitByQuery("Error と error と ERROR", "error")).toEqual([
+      { text: "Error", hit: true },
+      { text: " と ", hit: false },
+      { text: "error", hit: true },
+      { text: " と ", hit: false },
+      { text: "ERROR", hit: true },
+    ]);
+  });
+
+  it("一致しなければ全体を 1 つの非一致として返す", () => {
+    expect(splitByQuery("こんにちは", "xyz")).toEqual([{ text: "こんにちは", hit: false }]);
+  });
+
+  it("空白だけの検索語では何も一致させない", () => {
+    expect(splitByQuery("a b", " ")).toEqual([{ text: "a b", hit: false }]);
+  });
+
+  it("正規表現の記号もそのままの文字として探す", () => {
+    expect(splitByQuery("a.b axb", "a.b")).toEqual([
+      { text: "a.b", hit: true },
+      { text: " axb", hit: false },
+    ]);
   });
 });

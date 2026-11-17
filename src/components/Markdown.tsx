@@ -15,7 +15,7 @@ import { memo } from "react";
 import ReactMarkdown, { type Components } from "react-markdown";
 import rehypeHighlight from "rehype-highlight";
 import remarkGfm from "remark-gfm";
-import { splitUrls } from "../format";
+import { splitByQuery, splitUrls } from "../format";
 
 /** 色分けする言語。よく出るものだけに絞ってバンドルを小さくする */
 const LANGUAGES = { bash, css, diff, javascript, json, python, rust, sql, typescript, xml, yaml };
@@ -34,6 +34,28 @@ function rehypeLinkify() {
       return splitUrls(child.value).map((seg) =>
         seg.url
           ? { type: "element", tagName: "a", properties: { href: seg.url }, children: [{ type: "text", value: seg.text }] }
+          : { type: "text", value: seg.text },
+      );
+    }) as typeof node.children;
+  };
+  return (tree: Root) => walk(tree);
+}
+
+/**
+ * 検索語と一致した文字を <mark> で囲む。色分けやリンク化のあとに走らせ、テキストだけを書き換える。
+ * 色分けで別々の <span> に分かれた文字列をまたぐ一致は囲めない
+ */
+function rehypeMark({ query }: { query: string }) {
+  const walk = (node: Root | Element) => {
+    node.children = node.children.flatMap((child): ElementContent[] => {
+      if (child.type === "element") {
+        walk(child);
+        return [child];
+      }
+      if (child.type !== "text") return [child as ElementContent];
+      return splitByQuery(child.value, query).map((seg) =>
+        seg.hit
+          ? { type: "element", tagName: "mark", properties: {}, children: [{ type: "text", value: seg.text }] }
           : { type: "text", value: seg.text },
       );
     }) as typeof node.children;
@@ -61,12 +83,23 @@ const components: Components = {
  * Markdown を描画する。生の HTML は解釈せず文字として表示する (react-markdown の既定)。
  * ログには任意の文字列が入るため、rehype-raw は使わないこと。
  */
-export const Markdown = memo(function Markdown({ source, className = "" }: { source: string; className?: string }) {
+type MarkdownProps = {
+  source: string;
+  className?: string;
+  /** 一致した文字をハイライトする検索語 */
+  highlight?: string;
+};
+
+export const Markdown = memo(function Markdown({ source, className = "", highlight = "" }: MarkdownProps) {
   return (
     <div className={`md ${className}`}>
       <ReactMarkdown
         remarkPlugins={[remarkGfm]}
-        rehypePlugins={[[rehypeHighlight, { languages: LANGUAGES, aliases: ALIASES, detect: false, plainText: ["text"] }], rehypeLinkify]}
+        rehypePlugins={[
+          [rehypeHighlight, { languages: LANGUAGES, aliases: ALIASES, detect: false, plainText: ["text"] }],
+          rehypeLinkify,
+          ...(highlight.trim() ? [[rehypeMark, { query: highlight }] as [typeof rehypeMark, { query: string }]] : []),
+        ]}
         components={components}
       >
         {source}

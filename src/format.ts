@@ -106,3 +106,27 @@ export function splitUrls(text: string): Segment[] {
 }
 
 const count = (s: string, ch: string) => s.split(ch).length - 1;
+
+/** 検索語との一致で区切った断片 */
+export type QuerySegment = { text: string; hit: boolean };
+
+/** 検索語を大文字小文字を区別せずに、そのままの文字として探す正規表現。空白だけなら null */
+export function queryPattern(query: string): RegExp | null {
+  if (!query.trim()) return null;
+  return new RegExp(query.replace(/[.*+?^${}()|[\]\\]/g, "\\$&"), "gi");
+}
+
+/** テキストを検索語と一致した部分とそれ以外に分ける (ハイライト用) */
+export function splitByQuery(text: string, query: string): QuerySegment[] {
+  const pattern = queryPattern(query);
+  if (!pattern) return [{ text, hit: false }];
+  const segments: QuerySegment[] = [];
+  let last = 0;
+  for (const m of text.matchAll(pattern)) {
+    if (m.index > last) segments.push({ text: text.slice(last, m.index), hit: false });
+    segments.push({ text: m[0], hit: true });
+    last = m.index + m[0].length;
+  }
+  if (last < text.length || segments.length === 0) segments.push({ text: text.slice(last), hit: false });
+  return segments;
+}

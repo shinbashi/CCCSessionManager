@@ -1,4 +1,4 @@
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import {
   BLOCK_KINDS,
   formatTime,
@@ -15,10 +15,18 @@ import { Button, Chip, KindBadge, LiveBadge, LoadingPane, SubagentBadge } from "
 type Props = {
   sessions: SessionInfo[];
   onOpen: (s: SessionInfo, uuid: string | null) => void;
+  /** 変わるたびに検索欄へフォーカスする (⌘⇧F)。この画面は隠すだけで作り直さないので autoFocus は初回しか効かない */
+  focusKey: number;
 };
 
-export function SearchView({ sessions, onOpen }: Props) {
+export function SearchView({ sessions, onOpen, focusKey }: Props) {
   const [query, setQuery] = useState("");
+  const inputRef = useRef<HTMLInputElement>(null);
+  useEffect(() => {
+    if (focusKey === 0) return;
+    inputRef.current?.focus();
+    inputRef.current?.select();
+  }, [focusKey]);
   const [kinds, setKinds] = useState<Set<BlockKind>>(new Set(BLOCK_KINDS.map((k) => k.kind)));
   const [sessionKind, setSessionKind] = useState<KindFilter>("all");
   const [liveOnly, setLiveOnly] = useState(false);
@@ -68,6 +76,7 @@ export function SearchView({ sessions, onOpen }: Props) {
           }}
         >
           <input
+            ref={inputRef}
             autoFocus
             value={query}
             onChange={(e) => setQuery(e.target.value)}

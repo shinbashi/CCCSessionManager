@@ -15,6 +15,19 @@ function App() {
   const [mode, setMode] = useState<Mode>("sessions");
   const [selectedPath, setSelectedPath] = useState<string | null>(null);
   const [focusUuid, setFocusUuid] = useState<string | null>(null);
+  const [searchFocusKey, setSearchFocusKey] = useState(0);
+
+  // ⌘⇧F で全セッションの検索へ (⌘F は会話ビューの中の検索)
+  useEffect(() => {
+    const onKey = (e: KeyboardEvent) => {
+      if (!e.metaKey || !e.shiftKey || e.altKey || e.ctrlKey || e.key.toLowerCase() !== "f") return;
+      e.preventDefault();
+      setMode("search");
+      setSearchFocusKey((k) => k + 1);
+    };
+    window.addEventListener("keydown", onKey);
+    return () => window.removeEventListener("keydown", onKey);
+  }, []);
 
   const reload = useCallback(async () => {
     setLoading(true);
@@ -87,7 +100,7 @@ function App() {
 
         {/* 検索結果を保つため、検索画面は隠すだけにする */}
         <div className={mode === "search" ? "flex min-w-0 flex-1" : "hidden"}>
-          <SearchView sessions={sessions} onOpen={open} />
+          <SearchView sessions={sessions} onOpen={open} focusKey={searchFocusKey} />
         </div>
         {mode === "sessions" &&
           (selected ? (
