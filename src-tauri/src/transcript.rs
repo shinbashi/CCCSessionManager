@@ -146,7 +146,8 @@ pub fn summarize_file(path: &std::path::Path, project_dir: &str) -> TranscriptSu
 /// ユーザーが実際に打ち込んだ文章を取り出す。
 /// メタ情報・ツール実行結果・`<command-name>` などのタグで始まる出力は対象外。
 fn genuine_user_text(entry: &Value) -> Option<String> {
-    if entry["isMeta"] == true {
+    // claude -p などのプログラムが送ったプロンプト (要約フックの指示文など) は人の発言ではない
+    if entry["isMeta"] == true || entry["promptSource"] == "sdk" {
         return None;
     }
     let content = &entry["message"]["content"];
@@ -226,6 +227,16 @@ mod tests {
             r#"{"type":"user","message":{"content":"2番目の発言"}}"#,
         ]);
         assert_eq!(s.title(), Some("このエラーを直して"));
+    }
+
+    #[test]
+    fn prompts_sent_by_sdk_are_not_used_as_title() {
+        // claude -p で始まり、あとから人間が --resume したセッション
+        let s = summarize(&[
+            r#"{"type":"user","promptSource":"sdk","message":{"content":"Below is a conversation log ..."}}"#,
+            r#"{"type":"user","promptSource":"typed","message":{"content":"PRにコメントが来ています"}}"#,
+        ]);
+        assert_eq!(s.title(), Some("PRにコメントが来ています"));
     }
 
     #[test]

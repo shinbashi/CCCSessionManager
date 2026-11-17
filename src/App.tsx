@@ -46,7 +46,7 @@ function App() {
   };
 
   return (
-    <main className="flex h-screen flex-col bg-bg text-fg">
+    <main className="flex h-screen flex-col overflow-hidden bg-bg text-fg">
       {/* タイトルバーは Overlay なので、ヘッダーをドラッグ領域にし、左に信号機ボタン分の余白を取る (html の font-size が 13px なので rem ではなく px で指定) */}
       <header data-tauri-drag-region className="flex h-11 shrink-0 items-center gap-3 border-b border-line bg-panel pr-4 pl-[84px] select-none">
         <h1 data-tauri-drag-region className="text-sm font-bold tracking-wide">

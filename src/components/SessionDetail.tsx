@@ -51,7 +51,10 @@ export function SessionDetail({ session: s, focusUuid, onChanged, onOpenParent }
     <section className="flex min-w-0 flex-1 flex-col">
       <div className="space-y-2 border-b border-line px-4 py-3">
         <div className="flex items-start gap-2">
-          <h2 className="min-w-0 flex-1 text-base font-semibold break-words">{titleOf(s)}</h2>
+          {/* 最初の発言がタイトルになると数千字になることがあるので 2 行に収め、全文はホバーで見せる */}
+          <h2 className="line-clamp-2 min-w-0 flex-1 text-base font-semibold break-words" title={titleOf(s)}>
+            {titleOf(s)}
+          </h2>
           <LiveBadge session={s} />
           <SubagentBadge session={s} />
         </div>
